@@ -16,4 +16,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD wget --quiet --tries=1 --spider http://localhost:8080/healthz || exit 1
 
-CMD ["node", "server/server.js"]
+CMD ["node", "server_build/server.js"]
