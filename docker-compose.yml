@@ -6,9 +6,9 @@ services:
     container_name: unstablecorns
     restart: unless-stopped
     environment:
-      - PORT=8099
+      - PORT=8080
     ports:
-      - "8088:8099"   # host 8088 -> container 8080 (Node server); change 8088 to any free port
+      - "8088:8080"   # host 8088 -> container 8080 (Node server); change 8088 to any free port
     # The game's multiplayer uses WebSockets on this same port — if you put this
     # behind a reverse proxy, make sure it forwards Upgrade/Connection headers.
 
