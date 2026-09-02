@@ -10,8 +10,8 @@ RUN cd server && npm ci --omit=dev --no-audit --no-fund
 COPY server ./server
 COPY public ./public
 
-ENV PORT=8080
-EXPOSE 8080
+ENV PORT=8090
+EXPOSE 8090
 
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD wget --quiet --tries=1 --spider http://localhost:8080/healthz || exit 1
