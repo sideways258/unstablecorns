@@ -2,8 +2,8 @@ services:
   devils-in-the-details:
     # Pulls the image GitHub Actions builds and publishes automatically on every push to main.
     # Replace YOUR-GITHUB-USERNAME and YOUR-REPO-NAME below.
-    image: ghcr.io/sideways258/devilsite:latest
-    container_name: devils-in-the-details
+    image: ghcr.io/sideways258/unstablecorns:latest
+    container_name: unstablecorns
     restart: unless-stopped
     environment:
       - PORT=8080
