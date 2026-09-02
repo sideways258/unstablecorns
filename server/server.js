@@ -46,8 +46,8 @@ var PORT = process.env.PORT == null ? 8000 : parseInt(process.env.PORT);
 var frontEndAppBuildPath = path.resolve(__dirname, '../build');
 server.app.use(serve(frontEndAppBuildPath));
 var lobbyConfig = {
-    apiPort: 8080,
-    apiCallback: function () { return console.log('Running Lobby API on port 8080...'); }
+    apiPort: process.env.LOBBY_PORT == null ? 8090 : parseInt(process.env.LOBBY_PORT),
+    apiCallback: function () { return console.log('Running Lobby API on port ' + (process.env.LOBBY_PORT || 8090) + '...'); }
 };
 server.run({ port: PORT, lobbyConfig: lobbyConfig }, function () {
     server.app.use(function (ctx, next) { return __awaiter(void 0, void 0, void 0, function () {
