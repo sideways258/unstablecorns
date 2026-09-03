@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
 import { Screen, Panel, PanelTitle, PanelSubtitle, Button } from './ui/themed';
-import { COLORS, isValidLobbyCode } from './theme';
+import BackButton from './ui/BackButton';
+import { COLORS, isValidLobbyCode, normalizeLobbyCode } from './theme';
 
 type RouteParam = { matchID?: string; numPlayers?: string };
 
@@ -13,11 +14,20 @@ const SeatPicker = () => {
   const { matchID, numPlayers } = useParams<RouteParam>();
   const [copied, setCopied] = useState(false);
 
+  const code = normalizeLobbyCode(matchID || '');
   const count = parseInt(numPlayers || '0', 10);
 
-  if (!matchID || !isValidLobbyCode(matchID) || !(count >= 2 && count <= 8)) {
+  // Keep everyone on the same canonical (upper-case) code.
+  useEffect(() => {
+    if (matchID && matchID !== code && isValidLobbyCode(code)) {
+      history.replace(`/${code}/${count}`);
+    }
+  }, [matchID, code, count, history]);
+
+  if (!isValidLobbyCode(code) || !(count >= 2 && count <= 8)) {
     return (
       <Screen>
+        <BackButton />
         <Panel>
           <PanelTitle>Bad lobby link</PanelTitle>
           <p style={{ color: COLORS.textMuted }}>That lobby code or player count doesn't look right.</p>
@@ -27,7 +37,7 @@ const SeatPicker = () => {
     );
   }
 
-  const inviteLink = `${window.location.origin}/${matchID}/${count}`;
+  const inviteLink = `${window.location.origin}/${code}/${count}`;
 
   const copyInvite = async () => {
     try {
@@ -41,11 +51,12 @@ const SeatPicker = () => {
 
   return (
     <Screen>
+      <BackButton />
       <Panel>
-        <PanelTitle>Lobby {matchID}</PanelTitle>
+        <PanelTitle>Lobby {code}</PanelTitle>
         <p style={{ color: COLORS.textMuted, margin: '0 0 0.4em' }}>
-          Share the code <strong style={{ color: COLORS.text }}>{matchID}</strong> ({count} players), or send the
-          invite link:
+          Share the code <strong style={{ color: COLORS.text }}>{code}</strong> ({count} players), or send the invite
+          link:
         </p>
         <div
           style={{
@@ -72,7 +83,7 @@ const SeatPicker = () => {
           {Array.from({ length: count }, (_, i) => (
             <button
               key={i}
-              onClick={() => history.push(`/${matchID}/${count}/${i}`)}
+              onClick={() => history.push(`/${code}/${count}/${i}`)}
               style={{
                 padding: '1em 0',
                 borderRadius: 10,

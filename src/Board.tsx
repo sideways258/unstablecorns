@@ -1050,11 +1050,14 @@ const Wrapper = styled(motion.div)`
     height: 100vh;
     background-image: url(${BG});
     background-size: cover;
+    background-position: center;
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* keep the play area vertically centred; 'safe' avoids clipping if it ever overflows */
+    justify-content: safe center;
 `;
 
 const Top = styled.div`

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 import { COLORS } from '../theme';
 import { useAudioSettings } from '../audio';
@@ -12,9 +13,11 @@ type Props = {
 // Houses the master volume control, and - for the lobby host only - the
 // "end game for everyone" action.
 const SettingsMenu = ({ isHost, onEndGame }: Props) => {
+  const history = useHistory();
   const { volume, muted, setVolume, toggleMuted } = useAudioSettings();
   const [open, setOpen] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const speaker = muted || volume === 0 ? '🔇' : volume < 0.5 ? '🔈' : '🔊';
 
@@ -25,6 +28,7 @@ const SettingsMenu = ({ isHost, onEndGame }: Props) => {
         onClick={() => {
           setOpen((o) => !o);
           setConfirmEnd(false);
+          setConfirmLeave(false);
         }}
       >
         ⚙
@@ -56,6 +60,19 @@ const SettingsMenu = ({ isHost, onEndGame }: Props) => {
             />
             <Percent>{Math.round((muted ? 0 : volume) * 100)}%</Percent>
           </VolumeRow>
+
+          <SectionTitle>Leave</SectionTitle>
+          {!confirmLeave ? (
+            <GhostButton onClick={() => setConfirmLeave(true)}>Leave game</GhostButton>
+          ) : (
+            <>
+              <ConfirmText>Leave this game and go back to the home screen?</ConfirmText>
+              <ConfirmRow>
+                <GhostButton onClick={() => setConfirmLeave(false)}>Cancel</GhostButton>
+                <DangerButton onClick={() => history.push('/')}>Leave</DangerButton>
+              </ConfirmRow>
+            </>
+          )}
 
           {isHost && (
             <>

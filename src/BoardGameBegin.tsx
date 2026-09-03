@@ -5,6 +5,7 @@ import BG from './assets/ui/board-background.jpg';
 import { Card, CardID } from './game/card';
 import { UnstableUnicornsGame } from './game/game';
 import { PlayerID } from './game/player';
+import BackButton from './ui/BackButton';
 
 type Props = {
     G: UnstableUnicornsGame,
@@ -37,20 +38,20 @@ const BoardGameBegin = (props: Props) => {
 
     return (
         <Wrapper>
+            <BackButton to={props.matchID ? `/${props.matchID}/${numPlayers}` : "/"} />
             <div style={{
                 display: "flex",
                 width: "100%",
                 justifyContent: "center",
-                alignItems: "center",
-                borderRadius: "16pt",
-                height: "500px",
                 color: "white"
             }}>
                 <div style={{
                     backgroundColor: `#BC4747`,
-                    width: "70%",
+                    width: "100%",
+                    maxWidth: "780px",
                     padding: "2em",
-                    borderRadius: "16px"
+                    borderRadius: "16px",
+                    boxShadow: "0 12px 40px rgba(0,0,0,0.35)"
                 }}>
                     {props.matchID && (
                         <div style={{ marginBottom: "1.5em" }}>
@@ -96,6 +97,7 @@ const BoardGameBegin = (props: Props) => {
                     <h1>Choose your baby unicorn</h1>
                     <div style={{
                         display: "flex",
+                        flexWrap: "wrap",
                         justifyContent: "center",
                         marginTop: "1em"
                     }}>
@@ -150,14 +152,20 @@ const BoardGameBegin = (props: Props) => {
 
 const Wrapper = styled.div`
     width: 100%;
-    height: 100vh;
+    min-height: 100vh;
     background-image: url(${BG});
     background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* centre the panel when it fits, otherwise sit at the top and scroll (no clipping) */
+    justify-content: safe center;
+    padding: 64px 16px;
+    box-sizing: border-box;
 `;
 
 export default BoardGameBegin;

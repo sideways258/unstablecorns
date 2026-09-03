@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useHistory } from 'react-router-dom';
 import { Screen, Panel, PanelTitle, PanelSubtitle, Field, Select, Button, Row, Label } from './ui/themed';
-import { generateLobbyCode, isValidLobbyCode } from './theme';
+import { generateLobbyCode, isValidLobbyCode, normalizeLobbyCode, LOBBY_CODE_LENGTH } from './theme';
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6, 7, 8];
 
@@ -23,9 +23,9 @@ const Landing = () => {
 
   const joinLobby = (e: FormEvent) => {
     e.preventDefault();
-    const code = joinCode.trim();
+    const code = normalizeLobbyCode(joinCode);
     if (!isValidLobbyCode(code)) {
-      setJoinError('Enter the 6-digit code from the host.');
+      setJoinError(`Enter the ${LOBBY_CODE_LENGTH}-character code from the host.`);
       return;
     }
     history.push(`/${code}/${joinCount}`);
@@ -58,11 +58,13 @@ const Landing = () => {
               Lobby code
               <Field
                 value={joinCode}
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="6-digit code"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={LOBBY_CODE_LENGTH}
+                placeholder={`${LOBBY_CODE_LENGTH}-character code`}
                 onChange={(e) => {
-                  setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setJoinCode(normalizeLobbyCode(e.target.value).slice(0, LOBBY_CODE_LENGTH));
                   setJoinError('');
                 }}
               />

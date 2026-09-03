@@ -8,11 +8,15 @@ export const Screen = styled.div`
   background-image: url(${BOARD_BG});
   background-size: cover;
   background-position: center;
+  background-attachment: fixed;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
+  /* centre when it fits, fall back to top (no clipping) when taller than the viewport */
+  justify-content: safe center;
+  padding: 64px 24px;
   box-sizing: border-box;
+  overflow-y: auto;
   font-family: 'Open Sans', sans-serif;
 `;
 
