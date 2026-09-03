@@ -37,7 +37,7 @@ const GameClient = ({ debug }: Props) => {
             // (the UU board is scaled down to fit).
             return (
                 <>
-                    <Board {...boardProps} gameId={def.id} />
+                    <Board {...boardProps} gameId={def.id} gameName={def.name} />
                     <SettingsMenu
                         isHost={boardProps.playerID === '0'}
                         onEndGame={() => boardProps.moves && boardProps.moves.endMatch && boardProps.moves.endMatch()}

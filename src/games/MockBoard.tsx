@@ -4,6 +4,8 @@ import { BOARD_BG, COLORS, FONT_DISPLAY, GRADIENTS } from '../theme';
 import { MOCK_KIND_COLORS } from './mockCards';
 import type { MockGameState } from './mockGame';
 import GameEnded from '../ui/GameEnded';
+import LobbyView from '../ui/LobbyView';
+import { buildRoster } from '../ui/lobbyRoster';
 
 type Props = {
   G: MockGameState;
@@ -12,12 +14,18 @@ type Props = {
   playerID: string | null;
   matchID?: string;
   gameId?: string;
+  gameName?: string;
+  matchData?: any[];
+  gameMetadata?: any[];
 };
 
 // Generic board shared by every mock game. A real game ships its own board;
 // this one just renders hands / table / log so the plumbing is visible.
-const MockBoard = ({ G, ctx, moves, playerID, matchID, gameId }: Props) => {
+const MockBoard = (props: Props) => {
+  const { G, ctx, moves, playerID, matchID, gameId } = props;
   const [copied, setCopied] = useState(false);
+  const [lobbyName, setLobbyName] = useState('');
+  const [nameSaved, setNameSaved] = useState(false);
 
   if (ctx.gameover) {
     const winner = ctx.gameover.winner;
@@ -26,6 +34,52 @@ const MockBoard = ({ G, ctx, moves, playerID, matchID, gameId }: Props) => {
         icon={winner !== undefined ? '🏆' : '🚪'}
         title={winner !== undefined ? `Player ${winner} wins!` : 'Game over'}
         message={winner !== undefined ? 'They emptied their hand first.' : 'The host ended the game.'}
+      />
+    );
+  }
+
+  // --- Lobby phase: name + ready-up, same shape as Unstable Unicorns ---
+  if (ctx.phase === 'lobby') {
+    const matchData = props.matchData || props.gameMetadata;
+    const seatIds = Object.keys(G.ready);
+    const readyCount = seatIds.filter((id) => G.ready[id] === true).length;
+    const roster = buildRoster({
+      seatIds,
+      playerID,
+      matchData,
+      nameFor: (id) => (G.names[id] && G.names[id].trim() ? G.names[id] : undefined),
+      readyFor: (id) => G.ready[id] === true,
+    });
+    const isReady = playerID != null && G.ready[playerID] === true;
+
+    return (
+      <LobbyView
+        gameName={props.gameName || 'Game'}
+        matchID={matchID}
+        gameId={gameId}
+        numPlayers={ctx.numPlayers}
+        backTo={
+          playerID === '0' || !(gameId && matchID) ? '/' : `/${gameId}/${matchID}/${ctx.numPlayers}`
+        }
+        players={roster}
+        readyCount={readyCount}
+        nameValue={lobbyName}
+        onNameChange={(v) => {
+          setLobbyName(v);
+          setNameSaved(false);
+        }}
+        onSaveName={() => {
+          moves.setName(lobbyName);
+          setNameSaved(true);
+        }}
+        nameSaved={nameSaved}
+        isReady={isReady}
+        onReadyClick={() => moves.toggleReady()}
+        readyHint={
+          isReady
+            ? 'Tap again to unready. The game starts once everyone is ready.'
+            : 'The game starts once everyone is ready.'
+        }
       />
     );
   }
