@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 import { getGameById, DEFAULT_GAME_ID } from './games/registry';
 import { Screen, Panel, PanelTitle, Button } from './ui/themed';
 import BackButton from './ui/BackButton';
+import PlayerPresence from './ui/PlayerPresence';
 
 type RouteParam = {
     gameId?: string;
@@ -31,7 +32,12 @@ const GameClient = ({ debug }: Props) => {
         const board = (boardProps: any) => {
             const Board = def.board;
             // Inject the url game id so boards can build invite / back links.
-            return <Board {...boardProps} gameId={def.id} />;
+            return (
+                <>
+                    <Board {...boardProps} gameId={def.id} />
+                    <PlayerPresence {...boardProps} />
+                </>
+            );
         };
         return Client({
             game: def.bgGame,

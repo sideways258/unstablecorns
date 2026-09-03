@@ -108,8 +108,8 @@ const popIn = keyframes`
 
 const Root = styled.div`
   position: fixed;
-  top: 14px;
-  right: 14px;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
   z-index: 5000;
   font-family: ${FONT_DISPLAY};
 `;
@@ -138,7 +138,7 @@ const Panel = styled.div`
   position: absolute;
   top: 54px;
   right: 0;
-  width: 288px;
+  width: min(288px, calc(100vw - 28px));
   background: #241542;
   border: 1px solid ${COLORS.panelBorder};
   color: #fff;

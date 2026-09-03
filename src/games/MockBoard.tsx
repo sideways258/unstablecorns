@@ -162,8 +162,10 @@ const Screen = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
-  padding: 64px 16px 24px;
+  gap: 16px;
+  padding: clamp(56px, 15vw, 68px) clamp(10px, 4vw, 16px) 24px;
+  padding-left: max(clamp(10px, 4vw, 16px), env(safe-area-inset-left));
+  padding-right: max(clamp(10px, 4vw, 16px), env(safe-area-inset-right));
   font-family: 'Open Sans', sans-serif;
   color: #fff;
 
@@ -228,13 +230,19 @@ const panel = `
 
 const TableArea = styled.div`
   ${panel}
-  flex: 1 1 640px;
+  flex: 1 1 320px;
+  min-width: 0;
 `;
 
 const LogArea = styled.div`
   ${panel}
-  flex: 1 1 240px;
+  flex: 1 1 220px;
+  min-width: 0;
   max-width: 320px;
+
+  @media (max-width: 720px) {
+    max-width: none;
+  }
 `;
 
 const HandArea = styled.div`
@@ -260,7 +268,7 @@ const CardRow = styled.div`
 `;
 
 const cardBase = `
-  width: 150px;
+  width: clamp(124px, 42vw, 150px);
   min-height: 120px;
   background: rgba(255, 255, 255, 0.08);
   border: 2px solid #888;

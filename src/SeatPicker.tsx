@@ -121,8 +121,8 @@ const Hint = styled.p`
 
 const Seats = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 10px;
 `;
 
 const Seat = styled(motion.button)<{ $host: boolean }>`
@@ -144,7 +144,7 @@ const Seat = styled(motion.button)<{ $host: boolean }>`
 const SeatNum = styled.span`
   font-family: ${FONT_DISPLAY};
   font-weight: 700;
-  font-size: 20pt;
+  font-size: clamp(17px, 6vw, 24px);
   line-height: 1;
 `;
 

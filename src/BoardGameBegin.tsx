@@ -141,9 +141,11 @@ const Row = styled.div`
     flex-wrap: wrap;
     margin-top: 8px;
 
+    & > * {
+        min-height: 46px;
+    }
     & > *:first-child {
-        flex: 1;
-        min-width: 220px;
+        flex: 1 1 min(220px, 100%);
     }
 `;
 
@@ -167,8 +169,8 @@ const Hint = styled.p`
 
 const BabyGrid = styled.div`
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 10px;
     margin-top: 14px;
 `;
 

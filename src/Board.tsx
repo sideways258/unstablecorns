@@ -9,7 +9,6 @@ import { motion, AnimateSharedLayout, AnimatePresence } from "framer-motion";
 // game
 import { UnstableUnicornsGame, Ctx, _findOpenScenesWithProtagonist, Instruction, Scene, canDraw, canPlayCard, _findInProgressScenesWithProtagonist, _findInstruction } from './game/game';
 // assets
-import BG from './assets/ui/board-background.jpg';
 import UpgradeDowngradeStable from './ui/UpgradeDowngradeStable';
 import DrawPile from './ui/DrawPile';
 import Nursery from './ui/Nursery';
@@ -1048,9 +1047,6 @@ const renderInfoLabel = (G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, 
 const Wrapper = styled(motion.div)`
     width: 100%;
     height: 100vh;
-    background-image: url(${BG});
-    background-size: cover;
-    background-position: center;
     position: relative;
     overflow: hidden;
     display: flex;
@@ -1060,17 +1056,46 @@ const Wrapper = styled(motion.div)`
     justify-content: safe center;
     font-family: 'Fredoka', 'Open Sans', sans-serif;
 
-    /* warm candy vignette + corner glows, on-theme with the wood board */
+    /* dark walnut table surface with a fine wood grain + plank seams */
+    background-color: #362619;
+    background-image:
+        radial-gradient(1000px 720px at 8% -6%, rgba(248, 181, 0, 0.10), transparent 55%),
+        radial-gradient(1100px 800px at 100% 106%, rgba(188, 71, 71, 0.14), transparent 55%),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 5px),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.34) 0 2px, transparent 2px 240px),
+        linear-gradient(180deg, #4c3927 0%, #2b2014 100%);
+    box-shadow: inset 0 0 240px 72px rgba(0, 0, 0, 0.62);
+
+    /* green felt play-mat sitting on the table, with a gold-stitched edge */
     &::before {
         content: '';
         position: absolute;
-        inset: 0;
+        inset: 2.5vh 7vw 3vh;
+        border-radius: 90px / 120px;
         pointer-events: none;
         z-index: 0;
-        background:
-            radial-gradient(900px 600px at 8% 0%, rgba(248, 181, 0, 0.18), transparent 60%),
-            radial-gradient(900px 600px at 100% 100%, rgba(188, 71, 71, 0.28), transparent 60%),
-            radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.42) 100%);
+        background: radial-gradient(130% 100% at 50% 22%, #2f8267 0%, #1f5c4d 52%, #123c31 100%);
+        box-shadow:
+            0 0 0 5px #2a3d34,
+            0 0 0 8px rgba(212, 175, 55, 0.5),
+            inset 0 0 90px rgba(0, 0, 0, 0.5),
+            0 34px 70px rgba(0, 0, 0, 0.55);
+    }
+
+    /* The Unstable Unicorns board is a fixed desktop layout. On small screens,
+       let players pan/scroll around it instead of clipping it, and pin the felt
+       as a fixed backdrop. */
+    @media (max-width: 900px) {
+        height: 100dvh;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        align-items: flex-start;
+        justify-content: flex-start;
+        &::before {
+            position: fixed;
+            inset: 6px;
+            border-radius: 28px;
+        }
     }
 `;
 

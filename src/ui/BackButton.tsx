@@ -21,9 +21,10 @@ const BackButton = ({ to = '/', label = 'Back' }: Props) => {
 
 const Pill = styled.button`
   position: fixed;
-  top: 14px;
-  left: 14px;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(14px, env(safe-area-inset-left));
   z-index: 5000;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   gap: 8px;

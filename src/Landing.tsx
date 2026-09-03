@@ -156,12 +156,13 @@ const Landing = () => {
 const Hero = styled.div`
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   margin-bottom: 6px;
 `;
 
 const Logo = styled(motion.div)`
-  font-size: 44px;
+  font-size: clamp(34px, 11vw, 44px);
   line-height: 1;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
 `;
@@ -170,7 +171,7 @@ const Wordmark = styled.h1`
   margin: 0;
   font-family: ${FONT_DISPLAY};
   font-weight: 700;
-  font-size: 28pt;
+  font-size: clamp(22px, 7vw, 32px);
   letter-spacing: 1px;
   background: ${GRADIENTS.hero};
   -webkit-background-clip: text;
@@ -180,14 +181,18 @@ const Wordmark = styled.h1`
 
 const Sub = styled.div`
   color: ${COLORS.textMuted};
-  font-size: 10.5pt;
+  font-size: clamp(10px, 3vw, 12px);
   margin-top: 2px;
 `;
 
 const GameGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(146px, 1fr));
   gap: 12px;
+
+  @media (max-width: 360px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Tile = styled(motion.button)<{ $selected: boolean; $accent: string }>`

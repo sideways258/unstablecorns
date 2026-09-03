@@ -4,7 +4,9 @@ import { BOARD_BG, COLORS, GRADIENTS, FONT_DISPLAY, FONT_BODY, RADIUS, SHADOW } 
 // Drop <ThemeFX/> once near the app root for shared keyframes / base tweaks.
 export const ThemeFX = createGlobalStyle`
   :root { color-scheme: dark; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   * { -webkit-tap-highlight-color: transparent; }
+  button, [role="button"], a, input, select, label { touch-action: manipulation; }
   ::selection { background: ${COLORS.primary}; color: #fff; }
 `;
 
@@ -29,7 +31,9 @@ export const Screen = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: safe center;
-  padding: 72px 24px;
+  padding: clamp(52px, 12vw, 72px) clamp(14px, 5vw, 26px) clamp(34px, 11vw, 56px);
+  padding-left: max(clamp(14px, 5vw, 26px), env(safe-area-inset-left));
+  padding-right: max(clamp(14px, 5vw, 26px), env(safe-area-inset-right));
   overflow-x: hidden;
   overflow-y: auto;
   background: ${GRADIENTS.page};
@@ -70,7 +74,7 @@ export const Panel = styled.div`
   z-index: 1;
   width: 100%;
   max-width: 480px;
-  padding: 30px 30px 34px;
+  padding: clamp(18px, 5.5vw, 30px) clamp(18px, 5.5vw, 30px) clamp(22px, 6.5vw, 34px);
   border-radius: ${RADIUS};
   color: ${COLORS.text};
   background: ${COLORS.panel};
@@ -94,9 +98,10 @@ export const PanelTitle = styled.h1`
   margin: 0 0 0.5em;
   font-family: ${FONT_DISPLAY};
   font-weight: 700;
-  font-size: 30pt;
-  line-height: 1.05;
+  font-size: clamp(23px, 6.5vw, 34px);
+  line-height: 1.08;
   letter-spacing: 0.5px;
+  overflow-wrap: anywhere;
 `;
 
 export const PanelSubtitle = styled.h2`
@@ -106,7 +111,7 @@ export const PanelSubtitle = styled.h2`
   margin: 1.6em 0 0.7em;
   font-family: ${FONT_DISPLAY};
   font-weight: 600;
-  font-size: 12pt;
+  font-size: clamp(10px, 3vw, 13px);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: ${COLORS.textMuted};
@@ -124,12 +129,13 @@ export const PanelSubtitle = styled.h2`
 export const Field = styled.input`
   width: 100%;
   box-sizing: border-box;
+  min-height: 46px;
   padding: 0.85em 1em;
   background: ${COLORS.inputBg};
   border: 1.5px solid ${COLORS.panelBorder};
   border-radius: 12px;
   font-family: ${FONT_DISPLAY};
-  font-size: 15pt;
+  font-size: 17px;
   letter-spacing: 0.14em;
   color: ${COLORS.text};
   outline: none;
@@ -149,12 +155,13 @@ export const Field = styled.input`
 export const Select = styled.select`
   width: 100%;
   box-sizing: border-box;
+  min-height: 46px;
   padding: 0.85em 1em;
   background: ${COLORS.inputBg};
   border: 1.5px solid ${COLORS.panelBorder};
   border-radius: 12px;
   font-family: ${FONT_DISPLAY};
-  font-size: 13pt;
+  font-size: 17px;
   color: ${COLORS.text};
   outline: none;
   cursor: pointer;
@@ -172,12 +179,13 @@ export const Select = styled.select`
 export const Button = styled.button<{ $variant?: 'primary' | 'ghost' | 'danger' }>`
   position: relative;
   width: 100%;
+  min-height: 48px;
   padding: 0.9em 1.1em;
   border: none;
   border-radius: 14px;
   font-family: ${FONT_DISPLAY};
   font-weight: 700;
-  font-size: 14pt;
+  font-size: clamp(14px, 3.6vw, 19px);
   letter-spacing: 0.3px;
   cursor: pointer;
   overflow: hidden;
@@ -266,13 +274,14 @@ export const OrDivider = styled.div`
 export const CodeDisplay = styled.div`
   font-family: ${FONT_DISPLAY};
   font-weight: 700;
-  font-size: 26pt;
-  letter-spacing: 0.35em;
+  font-size: clamp(18px, 8vw, 30px);
+  letter-spacing: clamp(0.12em, 4vw, 0.35em);
   text-align: center;
-  padding: 0.5em 0.6em 0.5em 0.9em;
+  padding: 0.5em 0.4em 0.5em 0.6em;
   border-radius: 14px;
   color: ${COLORS.accentC};
   background: rgba(0, 0, 0, 0.28);
   border: 1.5px solid ${COLORS.panelBorder};
   text-shadow: 0 0 18px rgba(255, 209, 102, 0.45);
+  overflow-wrap: anywhere;
 `;
