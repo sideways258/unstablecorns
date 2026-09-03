@@ -6,6 +6,7 @@ import { getGameById, DEFAULT_GAME_ID } from './games/registry';
 import { Screen, Panel, PanelTitle, Button } from './ui/themed';
 import BackButton from './ui/BackButton';
 import PlayerPresence from './ui/PlayerPresence';
+import SettingsMenu from './ui/SettingsMenu';
 
 type RouteParam = {
     gameId?: string;
@@ -32,9 +33,15 @@ const GameClient = ({ debug }: Props) => {
         const board = (boardProps: any) => {
             const Board = def.board;
             // Inject the url game id so boards can build invite / back links.
+            // Overlays live outside the board so they stay full-size on mobile
+            // (the UU board is scaled down to fit).
             return (
                 <>
                     <Board {...boardProps} gameId={def.id} />
+                    <SettingsMenu
+                        isHost={boardProps.playerID === '0'}
+                        onEndGame={() => boardProps.moves && boardProps.moves.endMatch && boardProps.moves.endMatch()}
+                    />
                     <PlayerPresence {...boardProps} />
                 </>
             );

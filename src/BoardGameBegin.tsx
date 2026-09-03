@@ -15,6 +15,7 @@ type Props = {
     moves: any,
     matchID?: string,
     gameId?: string,
+    matchData?: Array<{ id: number | string; name?: string; isConnected?: boolean }>,
 };
 
 const BoardGameBegin = (props: Props) => {
@@ -26,6 +27,7 @@ const BoardGameBegin = (props: Props) => {
     const hasPick = !!props.G.babyStarter.find(s => s.owner === props.playerID);
 
     const numPlayers = props.G.players.length;
+    const readyCount = props.G.players.filter(p => props.G.ready[p.id] === true).length;
     const lobbyPath = props.gameId && props.matchID
         ? `/${props.gameId}/${props.matchID}/${numPlayers}`
         : "";
@@ -59,6 +61,40 @@ const BoardGameBegin = (props: Props) => {
                         <Hint>Share the code or link so friends can pick a seat. Seat 0 is the host.</Hint>
                     </>
                 )}
+
+                <PanelSubtitle>Players &middot; {readyCount}/{numPlayers} ready</PanelSubtitle>
+                <Roster>
+                    {props.G.players.map((pl) => {
+                        const meta = Array.isArray(props.matchData)
+                            ? props.matchData.find((m) => String(m.id) === String(pl.id))
+                            : undefined;
+                        const online = meta ? meta.isConnected !== false : true;
+                        const rdy = props.G.ready[pl.id] === true;
+                        const picked = !!props.G.babyStarter.find((s) => s.owner === pl.id);
+                        const me = String(pl.id) === String(props.playerID);
+                        const displayName = (pl.name && pl.name.trim()) || (meta && meta.name) || `Player ${pl.id}`;
+
+                        let tone: 'ready' | 'wait' | 'idle' | 'off' = 'idle';
+                        let label = 'Not ready';
+                        if (props.matchData && !online) { tone = 'off'; label = 'Not joined'; }
+                        else if (rdy) { tone = 'ready'; label = 'Ready'; }
+                        else if (picked) { tone = 'wait'; label = 'Picking…'; }
+
+                        return (
+                            <RosterRow key={pl.id}>
+                                <Dot $on={!props.matchData || online} />
+                                <RName>
+                                    {displayName}
+                                    {me && <MeTag>you</MeTag>}
+                                </RName>
+                                <StatusPill $tone={tone}>
+                                    {tone === 'ready' ? '✓ ' : ''}
+                                    {label}
+                                </StatusPill>
+                            </RosterRow>
+                        );
+                    })}
+                </Roster>
 
                 <PanelSubtitle>Your name</PanelSubtitle>
                 <Row>
@@ -165,6 +201,70 @@ const Hint = styled.p`
     color: ${COLORS.textMuted};
     font-size: 10.5pt;
     margin: 10px 0 0;
+`;
+
+const Roster = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+`;
+
+const RosterRow = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.55em 0.8em;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid ${COLORS.panelBorder};
+`;
+
+const Dot = styled.span<{ $on: boolean }>`
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: ${(p) => (p.$on ? '#37d9a0' : 'rgba(255,255,255,0.3)')};
+    box-shadow: ${(p) => (p.$on ? '0 0 8px #37d9a0' : 'none')};
+`;
+
+const RName = styled.span`
+    flex: 1;
+    min-width: 0;
+    font-family: ${FONT_DISPLAY};
+    font-weight: 600;
+    font-size: 12pt;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+`;
+
+const MeTag = styled.span`
+    margin-left: 6px;
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: ${COLORS.accentC};
+`;
+
+const StatusPill = styled.span<{ $tone: 'ready' | 'wait' | 'idle' | 'off' }>`
+    flex: none;
+    font-family: ${FONT_DISPLAY};
+    font-weight: 600;
+    font-size: 9.5pt;
+    padding: 3px 10px;
+    border-radius: 999px;
+    color: #fff;
+    background: ${(p) =>
+        p.$tone === 'ready'
+            ? 'linear-gradient(135deg, #4ade80, #148f4b)'
+            : p.$tone === 'wait'
+            ? 'linear-gradient(135deg, #ffcf5c, #e0961a)'
+            : p.$tone === 'off'
+            ? 'rgba(255,255,255,0.12)'
+            : 'rgba(255,255,255,0.16)'};
 `;
 
 const BabyGrid = styled.div`

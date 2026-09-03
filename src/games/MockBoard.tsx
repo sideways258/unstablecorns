@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import { BOARD_BG, COLORS, FONT_DISPLAY, GRADIENTS } from '../theme';
 import { MOCK_KIND_COLORS } from './mockCards';
 import type { MockGameState } from './mockGame';
-import SettingsMenu from '../ui/SettingsMenu';
 import GameEnded from '../ui/GameEnded';
 
 type Props = {
@@ -31,7 +30,6 @@ const MockBoard = ({ G, ctx, moves, playerID, matchID, gameId }: Props) => {
     );
   }
 
-  const isHost = playerID === '0';
   const isMyTurn = playerID != null && ctx.currentPlayer === playerID;
   const myHand = playerID != null ? G.hands[playerID] || [] : [];
   const seats = Object.keys(G.hands);
@@ -52,8 +50,6 @@ const MockBoard = ({ G, ctx, moves, playerID, matchID, gameId }: Props) => {
 
   return (
     <Screen>
-      <SettingsMenu isHost={isHost} onEndGame={() => moves.endMatch()} />
-
       <TopBar>
         {matchID && (
           <Chip>

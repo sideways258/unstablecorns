@@ -29,8 +29,8 @@ import Finder from './ui/Finder';
 import BoardGameBegin from './BoardGameBegin';
 import React from 'react';
 import { LanguageContext } from './LanguageContextProvider';
-import SettingsMenu from './ui/SettingsMenu';
 import GameEnded from './ui/GameEnded';
+import BoardShell from './ui/BoardShell';
 
 const YourTurnSound = require('./assets/sound/ALERT_YourTurn_0v2.ogg').default;
 const DrawCardSound = require('./assets/sound/draw_card_and_add_to_hand_1.ogg').default;
@@ -284,26 +284,28 @@ const Board = (props: any) => {
         }
     }, [G.uiCardToCard?.id]);
 
-    const isHost = playerID === "0";
-    const handleEndGame = () => moves.endMatch();
-
     if (ctx.gameover) {
         return <GameEnded />;
     }
 
     if (ctx.phase === "pregame") {
         return (
-            <>
-                <BoardGameBegin G={G} babyCards={_.first(G.deck, 13)} playerID={playerID} moves={moves} matchID={props.matchID} gameId={props.gameId} />
-                <SettingsMenu isHost={isHost} onEndGame={handleEndGame} />
-            </>
+            <BoardGameBegin
+                G={G}
+                babyCards={_.first(G.deck, 13)}
+                playerID={playerID}
+                moves={moves}
+                matchID={props.matchID}
+                gameId={props.gameId}
+                matchData={props.matchData || props.gameMetadata}
+            />
         );
     }
 
     return (
         <AnimateSharedLayout>
+          <BoardShell>
             <Wrapper layout onMouseMove={wrapperOnMouseMove}>
-                <SettingsMenu isHost={isHost} onEndGame={handleEndGame} />
                 <div style={{ position: "absolute", right: 0, color: "rgba(0,0,0,0)", height: "20px", width: "20px" }} onClick={() => {
                     moves.end(playerID);
                     /*
@@ -759,6 +761,7 @@ const Board = (props: any) => {
                         }, openScenes)}
                 </Bottom>
             </Wrapper>
+          </BoardShell>
             </AnimateSharedLayout>
     );
 }
@@ -1046,31 +1049,21 @@ const renderInfoLabel = (G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, 
 
 const Wrapper = styled(motion.div)`
     width: 100%;
-    height: 100vh;
+    height: 100%;
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* keep the play area vertically centred; 'safe' avoids clipping if it ever overflows */
     justify-content: safe center;
+    background: transparent;
     font-family: 'Fredoka', 'Open Sans', sans-serif;
 
-    /* dark walnut table surface with a fine wood grain + plank seams */
-    background-color: #362619;
-    background-image:
-        radial-gradient(1000px 720px at 8% -6%, rgba(248, 181, 0, 0.10), transparent 55%),
-        radial-gradient(1100px 800px at 100% 106%, rgba(188, 71, 71, 0.14), transparent 55%),
-        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 5px),
-        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.34) 0 2px, transparent 2px 240px),
-        linear-gradient(180deg, #4c3927 0%, #2b2014 100%);
-    box-shadow: inset 0 0 240px 72px rgba(0, 0, 0, 0.62);
-
-    /* green felt play-mat sitting on the table, with a gold-stitched edge */
+    /* green felt play-mat sitting on the table (the table itself is BoardShell) */
     &::before {
         content: '';
         position: absolute;
-        inset: 2.5vh 7vw 3vh;
+        inset: 26px 96px 30px;
         border-radius: 90px / 120px;
         pointer-events: none;
         z-index: 0;
@@ -1080,22 +1073,6 @@ const Wrapper = styled(motion.div)`
             0 0 0 8px rgba(212, 175, 55, 0.5),
             inset 0 0 90px rgba(0, 0, 0, 0.5),
             0 34px 70px rgba(0, 0, 0, 0.55);
-    }
-
-    /* The Unstable Unicorns board is a fixed desktop layout. On small screens,
-       let players pan/scroll around it instead of clipping it, and pin the felt
-       as a fixed backdrop. */
-    @media (max-width: 900px) {
-        height: 100dvh;
-        overflow: auto;
-        -webkit-overflow-scrolling: touch;
-        align-items: flex-start;
-        justify-content: flex-start;
-        &::before {
-            position: fixed;
-            inset: 6px;
-            border-radius: 28px;
-        }
     }
 `;
 

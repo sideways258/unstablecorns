@@ -1,11 +1,26 @@
+import { createPortal } from 'react-dom';
+
 type Props = {
     from: { x: number, y: number };
     to: { x: number, y: number };
 };
 
-const RainbowArrow = ({from, to}: Props) => {
-    return (
-        <svg style={{ position: "absolute", zIndex: 9000, pointerEvents: "none", height: "100%", width: "100%" }}>
+// `from`/`to` are viewport (clientX/Y) coordinates. The board itself is rendered
+// inside a scaled/translated container (BoardShell) on small screens, so this
+// arrow is portalled to <body> to draw in true viewport space.
+const RainbowArrow = ({ from, to }: Props) => {
+    return createPortal(
+        <svg
+            style={{
+                position: "fixed",
+                left: 0,
+                top: 0,
+                width: "100vw",
+                height: "100vh",
+                zIndex: 9000,
+                pointerEvents: "none",
+            }}
+        >
             <defs>
                 <linearGradient id="myGradient" gradientTransform="rotate(90)">
                     <stop offset="12.5%" stopColor="#E02020" />
@@ -18,7 +33,8 @@ const RainbowArrow = ({from, to}: Props) => {
                 </linearGradient>
             </defs>
             <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} style={{ strokeWidth: 25 }} strokeDasharray="20" stroke="url('#myGradient')" />
-        </svg>
+        </svg>,
+        document.body
     );
 }
 
