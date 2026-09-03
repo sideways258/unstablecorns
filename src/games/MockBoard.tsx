@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import styled from 'styled-components';
-import { BOARD_BG, COLORS } from '../theme';
+import { BOARD_BG, COLORS, FONT_DISPLAY, GRADIENTS } from '../theme';
 import { MOCK_KIND_COLORS } from './mockCards';
 import type { MockGameState } from './mockGame';
 import SettingsMenu from '../ui/SettingsMenu';
@@ -24,6 +24,7 @@ const MockBoard = ({ G, ctx, moves, playerID, matchID, gameId }: Props) => {
     const winner = ctx.gameover.winner;
     return (
       <GameEnded
+        icon={winner !== undefined ? '🏆' : '🚪'}
         title={winner !== undefined ? `Player ${winner} wins!` : 'Game over'}
         message={winner !== undefined ? 'They emptied their hand first.' : 'The host ended the game.'}
       />
@@ -157,10 +158,7 @@ const Screen = styled.div`
   min-height: 100vh;
   width: 100%;
   box-sizing: border-box;
-  background-image: url(${BOARD_BG});
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  background: ${GRADIENTS.page};
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -168,6 +166,17 @@ const Screen = styled.div`
   padding: 64px 16px 24px;
   font-family: 'Open Sans', sans-serif;
   color: #fff;
+
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url(${BOARD_BG});
+    background-size: cover;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
 `;
 
 const TopBar = styled.div`
@@ -194,7 +203,7 @@ const TurnPill = styled.div<{ $me: boolean }>`
   font-weight: 800;
   font-size: 10pt;
   background: ${(p) => (p.$me ? '#fff' : 'transparent')};
-  color: ${(p) => (p.$me ? COLORS.panel : '#fff')};
+  color: ${(p) => (p.$me ? COLORS.panelSolid : '#fff')};
   border: 2px solid #fff;
 `;
 
@@ -207,10 +216,14 @@ const Middle = styled.div`
 `;
 
 const panel = `
+  position: relative;
   background: ${COLORS.panel};
-  border-radius: 16px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid ${COLORS.panelBorder};
+  border-radius: 18px;
   padding: 1.2em;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.4);
 `;
 
 const TableArea = styled.div`
@@ -231,8 +244,10 @@ const HandArea = styled.div`
 `;
 
 const SectionLabel = styled.div`
+  font-family: ${FONT_DISPLAY};
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.1em;
   font-size: 9pt;
   opacity: 0.8;
   margin-bottom: 0.7em;
@@ -266,6 +281,15 @@ const DisplayCard = styled.div`
 const HandCard = styled.button`
   ${cardBase}
   cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  &:not(:disabled):hover {
+    transform: translateY(-8px) rotate(-1deg);
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.4);
+  }
+  &:not(:disabled):active {
+    transform: translateY(-2px);
+  }
   &:disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -341,13 +365,20 @@ const Actions = styled.div`
 
 const ActionButton = styled.button`
   padding: 0.7em 1.4em;
-  border-radius: 10px;
-  border: 2px solid #fff;
-  background: #fff;
-  color: ${COLORS.panel};
-  font-weight: 800;
-  font-size: 10pt;
+  border-radius: 12px;
+  border: none;
+  background: ${GRADIENTS.hero};
+  color: #fff;
+  font-family: ${FONT_DISPLAY};
+  font-weight: 700;
+  font-size: 11pt;
   cursor: pointer;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.28);
+  transition: transform 0.08s ease, box-shadow 0.1s ease;
+  &:not(:disabled):active {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
+  }
   &:disabled {
     opacity: 0.45;
     cursor: not-allowed;

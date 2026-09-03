@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
-import { Screen, Panel, PanelTitle, Button } from './ui/themed';
+import styled, { keyframes } from 'styled-components';
+import { Screen, Panel, PanelTitle, Button, CodeDisplay } from './ui/themed';
 import BackButton from './ui/BackButton';
-import { COLORS, isValidLobbyCode, normalizeLobbyCode } from './theme';
+import { COLORS, GRADIENTS, isValidLobbyCode, normalizeLobbyCode } from './theme';
 import { GAMES } from './games/registry';
 
 type RouteParam = { code?: string };
 type State = 'looking' | 'notfound' | 'bad';
 
-// "/join/:code" - finds which game the lobby belongs to and how many players it
-// has by querying the boardgame.io lobby REST API for each registered game, then
-// forwards to that game's seat picker. Retries until the host opens the lobby.
 const JoinResolver = () => {
   const history = useHistory();
   const { code: rawCode } = useParams<RouteParam>();
@@ -43,7 +41,6 @@ const JoinResolver = () => {
   useEffect(() => {
     if (state === 'bad') return;
     lookup();
-    // The host may open the lobby a moment after the joiner - keep checking.
     const timer = setInterval(lookup, 3000);
     return () => clearInterval(timer);
   }, [state, lookup]);
@@ -54,15 +51,20 @@ const JoinResolver = () => {
       <Panel>
         {state === 'bad' && (
           <>
-            <PanelTitle>Bad lobby code</PanelTitle>
+            <PanelTitle>Bad lobby code 🤔</PanelTitle>
             <p style={{ color: COLORS.textMuted }}>That code doesn&rsquo;t look right.</p>
             <Button onClick={() => history.push('/')}>Back to home</Button>
           </>
         )}
         {state === 'looking' && (
           <>
-            <PanelTitle>Joining {code}&hellip;</PanelTitle>
-            <p style={{ color: COLORS.textMuted }}>Finding the lobby.</p>
+            <PanelTitle>Finding your lobby</PanelTitle>
+            <CodeDisplay>{code}</CodeDisplay>
+            <Dots>
+              <i />
+              <i />
+              <i />
+            </Dots>
           </>
         )}
         {state === 'notfound' && (
@@ -72,7 +74,7 @@ const JoinResolver = () => {
               Ask the host to open it, or use their invite link. This page keeps checking automatically.
             </p>
             <Button $variant="ghost" onClick={lookup}>
-              Try again now
+              Check again now
             </Button>
           </>
         )}
@@ -80,5 +82,31 @@ const JoinResolver = () => {
     </Screen>
   );
 };
+
+const bounce = keyframes`
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-10px); opacity: 1; }
+`;
+
+const Dots = styled.div`
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 22px 0 6px;
+
+  i {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: ${GRADIENTS.hero};
+    animation: ${bounce} 1.2s infinite ease-in-out;
+  }
+  i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+`;
 
 export default JoinResolver;

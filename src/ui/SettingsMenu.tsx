@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useHistory } from 'react-router-dom';
-import styled from 'styled-components';
-import { COLORS } from '../theme';
+import styled, { keyframes } from 'styled-components';
+import { COLORS, FONT_DISPLAY } from '../theme';
 import { useAudioSettings } from '../audio';
 
 type Props = {
@@ -96,46 +96,63 @@ const SettingsMenu = ({ isHost, onEndGame }: Props) => {
   );
 };
 
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(90deg); }
+`;
+
+const popIn = keyframes`
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+`;
+
 const Root = styled.div`
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: 14px;
+  right: 14px;
   z-index: 5000;
-  font-family: 'Open Sans', sans-serif;
+  font-family: ${FONT_DISPLAY};
 `;
 
 const IconButton = styled.button`
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  border: 2px solid #fff;
-  background: ${COLORS.panel};
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(20, 12, 34, 0.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: #fff;
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s ease;
   &:hover {
-    filter: brightness(1.1);
+    background: rgba(124, 92, 255, 0.45);
+    animation: ${spin} 0.4s ease forwards;
   }
 `;
 
 const Panel = styled.div`
   position: absolute;
-  top: 50px;
+  top: 54px;
   right: 0;
-  width: 280px;
-  background: ${COLORS.panel};
+  width: 288px;
+  background: #241542;
+  border: 1px solid ${COLORS.panelBorder};
   color: #fff;
-  border-radius: 12px;
-  padding: 14px 16px 18px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  border-radius: 16px;
+  padding: 16px 18px 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  animation: ${popIn} 0.18s ease both;
 `;
 
 const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-family: ${FONT_DISPLAY};
   font-weight: 700;
   font-size: 14pt;
 `;

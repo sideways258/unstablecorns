@@ -3,10 +3,12 @@ import Client from './Client';
 import Landing from './Landing';
 import SeatPicker from './SeatPicker';
 import JoinResolver from './JoinResolver';
+import { ThemeFX } from './ui/themed';
 
 const App = () => {
   return (
     <div>
+      <ThemeFX />
       <Router>
         <Switch>
           <Route path="/test">

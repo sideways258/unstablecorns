@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
-import { Screen, Panel, PanelTitle, PanelSubtitle, Button } from './ui/themed';
+import styled from 'styled-components';
+import { motion } from 'framer-motion';
+import { Screen, Panel, PanelTitle, PanelSubtitle, Button, CodeDisplay } from './ui/themed';
 import BackButton from './ui/BackButton';
-import { COLORS, isValidLobbyCode, normalizeLobbyCode } from './theme';
+import { COLORS, FONT_DISPLAY, isValidLobbyCode, normalizeLobbyCode } from './theme';
 import { getGameById } from './games/registry';
 
 type RouteParam = { gameId?: string; matchID?: string; numPlayers?: string };
 
-// "/:gameId/:code/:numPlayers" - pick which seat you are before entering the game.
-// The host shares "<origin>/<gameId>/<code>/<numPlayers>" and each player taps a
-// different number.
 const SeatPicker = () => {
   const history = useHistory();
   const { gameId, matchID, numPlayers } = useParams<RouteParam>();
@@ -19,7 +18,6 @@ const SeatPicker = () => {
   const code = normalizeLobbyCode(matchID || '');
   const count = parseInt(numPlayers || '0', 10);
 
-  // Keep everyone on the same canonical (upper-case) code.
   useEffect(() => {
     if (game && matchID && matchID !== code && isValidLobbyCode(code)) {
       history.replace(`/${game.id}/${code}/${count}`);
@@ -34,7 +32,7 @@ const SeatPicker = () => {
       <Screen>
         <BackButton />
         <Panel>
-          <PanelTitle>Bad lobby link</PanelTitle>
+          <PanelTitle>Bad lobby link 🤔</PanelTitle>
           <p style={{ color: COLORS.textMuted }}>
             That game, lobby code or player count doesn&rsquo;t look right.
           </p>
@@ -50,7 +48,7 @@ const SeatPicker = () => {
     try {
       await navigator.clipboard.writeText(inviteLink);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 1800);
     } catch (e) {
       /* clipboard blocked - the link is on screen anyway */
     }
@@ -60,61 +58,102 @@ const SeatPicker = () => {
     <Screen>
       <BackButton />
       <Panel>
-        <PanelTitle>{game.name}</PanelTitle>
-        <p style={{ color: COLORS.textMuted, margin: '0 0 0.4em' }}>
-          Lobby <strong style={{ color: COLORS.text }}>{code}</strong> · {count} players. Share the code, or send the
-          invite link:
-        </p>
-        <div
-          style={{
-            fontFamily: 'monospace',
-            fontSize: '11pt',
-            background: COLORS.inputBg,
-            padding: '0.7em 0.9em',
-            borderRadius: 8,
-            wordBreak: 'break-all',
-            marginBottom: '0.6em',
-          }}
-        >
-          {inviteLink}
-        </div>
+        <PanelTitle>
+          {game.icon} {game.name}
+        </PanelTitle>
+
+        <PanelSubtitle>Lobby code</PanelSubtitle>
+        <CodeDisplay>{code}</CodeDisplay>
+        <Meta>{count} players · read the code out or share the link</Meta>
+        <LinkBox>{inviteLink}</LinkBox>
         <Button $variant="ghost" onClick={copyInvite}>
-          {copied ? 'Copied!' : 'Copy invite link'}
+          {copied ? '✓ Copied!' : 'Copy invite link'}
         </Button>
 
         <PanelSubtitle>Take a seat</PanelSubtitle>
-        <p style={{ color: COLORS.textMuted, marginTop: 0, fontSize: '11pt' }}>
-          Pick a free number. Seat 0 is the host. If two of you clash, one just picks again.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        <Hint>Pick a free number. Seat 0 is the host. If two of you clash, one just picks again.</Hint>
+        <Seats>
           {Array.from({ length: count }, (_, i) => {
             const isHostSeat = i === 0;
             return (
-              <button
+              <Seat
                 key={i}
+                type="button"
                 disabled={isHostSeat}
+                $host={isHostSeat}
+                whileHover={isHostSeat ? undefined : { y: -4, scale: 1.06 }}
+                whileTap={isHostSeat ? undefined : { scale: 0.92 }}
                 onClick={() => history.push(`/${game.id}/${code}/${count}/${i}`)}
-                style={{
-                  padding: '1em 0',
-                  borderRadius: 10,
-                  border: `2px solid ${COLORS.text}`,
-                  background: 'transparent',
-                  color: COLORS.text,
-                  fontWeight: 800,
-                  fontSize: '16pt',
-                  cursor: isHostSeat ? 'not-allowed' : 'pointer',
-                  opacity: isHostSeat ? 0.45 : 1,
-                }}
               >
-                {i}
-                {isHostSeat && <div style={{ fontSize: '8pt', fontWeight: 700 }}>HOST</div>}
-              </button>
+                <SeatNum>{i}</SeatNum>
+                <SeatTag>{isHostSeat ? 'HOST' : 'JOIN'}</SeatTag>
+              </Seat>
             );
           })}
-        </div>
+        </Seats>
       </Panel>
     </Screen>
   );
 };
+
+const Meta = styled.div`
+  color: ${COLORS.textMuted};
+  font-size: 10pt;
+  margin: 8px 0 10px;
+`;
+
+const LinkBox = styled.div`
+  font-family: 'Open Sans', monospace;
+  font-size: 10.5pt;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1.5px solid ${COLORS.panelBorder};
+  padding: 0.7em 0.9em;
+  border-radius: 10px;
+  word-break: break-all;
+  margin-bottom: 10px;
+`;
+
+const Hint = styled.p`
+  color: ${COLORS.textMuted};
+  font-size: 10.5pt;
+  margin: 0 0 12px;
+`;
+
+const Seats = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 12px;
+`;
+
+const Seat = styled(motion.button)<{ $host: boolean }>`
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  border: 2px solid ${(p) => (p.$host ? 'rgba(255,255,255,0.3)' : '#fff')};
+  background: ${(p) =>
+    p.$host ? 'rgba(255,255,255,0.05)' : 'linear-gradient(150deg, rgba(124,92,255,0.35), rgba(34,211,238,0.25))'};
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: ${(p) => (p.$host ? 'not-allowed' : 'pointer')};
+  opacity: ${(p) => (p.$host ? 0.5 : 1)};
+`;
+
+const SeatNum = styled.span`
+  font-family: ${FONT_DISPLAY};
+  font-weight: 700;
+  font-size: 20pt;
+  line-height: 1;
+`;
+
+const SeatTag = styled.span`
+  font-family: ${FONT_DISPLAY};
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  opacity: 0.8;
+`;
 
 export default SeatPicker;
