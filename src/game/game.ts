@@ -260,6 +260,8 @@ function ready(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
 }
 
 function selectBaby(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, cardID: CardID) {
+    // Players may change their pick in the lobby: drop any previous choice first.
+    G.babyStarter = G.babyStarter.filter(s => s.owner !== protagonist);
     G.babyStarter.push({
         cardID, owner: protagonist
     });

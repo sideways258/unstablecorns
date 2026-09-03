@@ -193,6 +193,8 @@ function ready(G, ctx, protagonist) {
     }
 }
 function selectBaby(G, ctx, protagonist, cardID) {
+    // Players may change their pick in the lobby: drop any previous choice first.
+    G.babyStarter = G.babyStarter.filter(function (s) { return s.owner !== protagonist; });
     G.babyStarter.push({
         cardID: cardID,
         owner: protagonist

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import Client from './Client';
 import Landing from './Landing';
 import SeatPicker from './SeatPicker';
+import JoinResolver from './JoinResolver';
 
 const App = () => {
   return (
@@ -10,6 +11,9 @@ const App = () => {
         <Switch>
           <Route path="/test">
             <Client debug={"test"}/>
+          </Route>
+          <Route exact path="/join/:code">
+              <JoinResolver />
           </Route>
           <Route path="/:matchID/:numPlayers/:playerID">
               <Client />

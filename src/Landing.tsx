@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useHistory } from 'react-router-dom';
-import { Screen, Panel, PanelTitle, PanelSubtitle, Field, Select, Button, Row, Label } from './ui/themed';
+import { Screen, Panel, PanelTitle, PanelSubtitle, Field, Select, Button, Row, Label, OrDivider } from './ui/themed';
 import { generateLobbyCode, isValidLobbyCode, normalizeLobbyCode, LOBBY_CODE_LENGTH } from './theme';
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6, 7, 8];
@@ -12,13 +12,13 @@ const Landing = () => {
 
   const [createCount, setCreateCount] = useState('4');
   const [joinCode, setJoinCode] = useState('');
-  const [joinCount, setJoinCount] = useState('4');
   const [joinError, setJoinError] = useState('');
 
   const createLobby = () => {
     const code = generateLobbyCode();
-    // Host lands on the seat picker for the new lobby (they take seat 0).
-    history.push(`/${code}/${createCount}`);
+    // Host goes straight into the lobby as seat 0. This also registers the match
+    // on the server so people joining by code can look up its player count.
+    history.push(`/${code}/${createCount}/0`);
   };
 
   const joinLobby = (e: FormEvent) => {
@@ -28,7 +28,8 @@ const Landing = () => {
       setJoinError(`Enter the ${LOBBY_CODE_LENGTH}-character code from the host.`);
       return;
     }
-    history.push(`/${code}/${joinCount}`);
+    // The player count comes from the lobby itself - not something the joiner sets.
+    history.push(`/join/${code}`);
   };
 
   return (
@@ -51,6 +52,10 @@ const Landing = () => {
           <Button onClick={createLobby}>Create lobby &amp; get code</Button>
         </Row>
 
+        <OrDivider>
+          <span>or</span>
+        </OrDivider>
+
         <PanelSubtitle>Join a lobby</PanelSubtitle>
         <form onSubmit={joinLobby}>
           <Row>
@@ -68,16 +73,6 @@ const Landing = () => {
                   setJoinError('');
                 }}
               />
-            </Label>
-            <Label>
-              Number of players (ask the host)
-              <Select value={joinCount} onChange={(e) => setJoinCount(e.target.value)}>
-                {PLAYER_COUNTS.map((n) => (
-                  <option key={n} value={n}>
-                    {n} players
-                  </option>
-                ))}
-              </Select>
             </Label>
             {joinError && <div style={{ color: '#ffd9d9', fontSize: '11pt' }}>{joinError}</div>}
             <Button type="submit" $variant="ghost">

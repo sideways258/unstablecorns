@@ -77,28 +77,33 @@ const SeatPicker = () => {
 
         <PanelSubtitle>Take a seat</PanelSubtitle>
         <p style={{ color: COLORS.textMuted, marginTop: 0, fontSize: '11pt' }}>
-          Everyone picks a different number. Seat 0 is the lobby host and can end the game.
+          Pick a free number. Seat 0 is the host. If two of you clash, one just picks again.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-          {Array.from({ length: count }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => history.push(`/${code}/${count}/${i}`)}
-              style={{
-                padding: '1em 0',
-                borderRadius: 10,
-                border: `2px solid ${COLORS.text}`,
-                background: i === 0 ? COLORS.text : 'transparent',
-                color: i === 0 ? COLORS.panel : COLORS.text,
-                fontWeight: 800,
-                fontSize: '16pt',
-                cursor: 'pointer',
-              }}
-            >
-              {i}
-              {i === 0 && <div style={{ fontSize: '8pt', fontWeight: 700 }}>HOST</div>}
-            </button>
-          ))}
+          {Array.from({ length: count }, (_, i) => {
+            const isHostSeat = i === 0;
+            return (
+              <button
+                key={i}
+                disabled={isHostSeat}
+                onClick={() => history.push(`/${code}/${count}/${i}`)}
+                style={{
+                  padding: '1em 0',
+                  borderRadius: 10,
+                  border: `2px solid ${COLORS.text}`,
+                  background: 'transparent',
+                  color: COLORS.text,
+                  fontWeight: 800,
+                  fontSize: '16pt',
+                  cursor: isHostSeat ? 'not-allowed' : 'pointer',
+                  opacity: isHostSeat ? 0.45 : 1,
+                }}
+              >
+                {i}
+                {isHostSeat && <div style={{ fontSize: '8pt', fontWeight: 700 }}>HOST</div>}
+              </button>
+            );
+          })}
         </div>
       </Panel>
     </Screen>

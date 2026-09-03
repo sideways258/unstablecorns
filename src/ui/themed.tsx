@@ -101,6 +101,26 @@ export const Row = styled.div`
   gap: 12px;
 `;
 
+// Horizontal rule with a centred "or" label, for separating two choices.
+export const OrDivider = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 4px;
+  color: ${COLORS.textMuted};
+  text-transform: uppercase;
+  font-size: 11pt;
+  letter-spacing: 0.08em;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: ${COLORS.panelBorder};
+  }
+`;
+
 export const Label = styled.label`
   display: grid;
   gap: 6px;

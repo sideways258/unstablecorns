@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, CSSProperties } from 'react';
 import styled from 'styled-components';
 import ImageLoader from './assets/card/imageLoader';
 import BG from './assets/ui/board-background.jpg';
@@ -20,6 +20,9 @@ const BoardGameBegin = (props: Props) => {
     const [playerName, setPlayerName] = useState<string>("Spieler");
     const [copied, setCopied] = useState<boolean>(false);
 
+    const isReady = props.G.ready[props.playerID] === true;
+    const hasPick = !!props.G.babyStarter.find(s => s.owner === props.playerID);
+
     const numPlayers = props.G.players.length;
     const inviteLink = props.matchID
         ? `${window.location.origin}/${props.matchID}/${numPlayers}`
@@ -38,7 +41,13 @@ const BoardGameBegin = (props: Props) => {
 
     return (
         <Wrapper>
-            <BackButton to={props.matchID ? `/${props.matchID}/${numPlayers}` : "/"} />
+            <BackButton
+                to={
+                    props.playerID === "0" || !props.matchID
+                        ? "/"
+                        : `/${props.matchID}/${numPlayers}`
+                }
+            />
             <div style={{
                 display: "flex",
                 width: "100%",
@@ -95,6 +104,13 @@ const BoardGameBegin = (props: Props) => {
                         props.moves.changeName(props.playerID, playerName);
                     }}>Change name</button>
                     <h1>Choose your baby unicorn</h1>
+                    <p style={{ fontSize: "10pt", opacity: 0.8, margin: "0.3em 0 0" }}>
+                        {isReady
+                            ? "You're ready - your pick is locked in."
+                            : hasPick
+                                ? "Click another unicorn to change your pick."
+                                : "Click a unicorn to pick it."}
+                    </p>
                     <div style={{
                         display: "flex",
                         flexWrap: "wrap",
@@ -102,26 +118,23 @@ const BoardGameBegin = (props: Props) => {
                         marginTop: "1em"
                     }}>
                         {props.babyCards.map(card => {
-                            let style = {}
-                            const t = props.G.babyStarter.find(f => f.cardID === card.id);
+                            const owner = props.G.babyStarter.find(f => f.cardID === card.id);
+                            const mine = owner?.owner === props.playerID;
+                            const takenByOther = !!owner && !mine;
+                            const selectable = !isReady && !takenByOther;
 
-                            if (t) {
-                                if (t.owner === props.playerID) {
-                                    style = {
-                                        border: "4px solid white",
-                                    }
-                                } else {
-                                    style = {
-                                        border: "4px solid white",
-                                        opacity: 0.3,
-                                        cursor: "not-allowed"
-                                    }
-                                }  
-                            } 
+                            let style: CSSProperties = { cursor: "pointer" };
+                            if (mine) {
+                                style = { cursor: isReady ? "default" : "pointer", border: "4px solid white", transform: "scale(1.06)" };
+                            } else if (takenByOther) {
+                                style = { border: "4px solid rgba(255,255,255,0.5)", opacity: 0.3, cursor: "not-allowed" };
+                            } else if (isReady) {
+                                style = { opacity: 0.5, cursor: "not-allowed" };
+                            }
 
                             return (<div style={{ margin: "0.5em" }} key={card.id}>
-                                <img style={{ cursor: "pointer", ...style, borderRadius: "16px" }} src={ImageLoader.load(card.image)} width="100%" onClick={() => {
-                                    if (props.G.babyStarter.find(s => s.owner === props.playerID)) {
+                                <img style={{ ...style, borderRadius: "16px", transition: "transform 0.1s ease" }} src={ImageLoader.load(card.image)} width="100%" onClick={() => {
+                                    if (!selectable) {
                                         return;
                                     }
                                     props.moves.selectBaby(props.playerID, card.id);
@@ -129,7 +142,7 @@ const BoardGameBegin = (props: Props) => {
                             </div>)
                         })}
                     </div>
-                    {props.G.babyStarter.find(s => s.owner === props.playerID) && (
+                    {hasPick && (
                     <div style={{
                         cursor: "pointer",
                         padding: "1em",
