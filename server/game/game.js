@@ -212,14 +212,18 @@ function setExpansions(G, ctx, sets) {
 }
 var UNICORN_TYPES = ["baby", "basic", "unicorn", "narwhal"];
 // Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all
-// count; a "count_as_two" passive counts twice). 7 wins.
+// count). A card counts twice if it has the "count_as_two" passive OR it granted
+// the player a "count_as_two" effect on entering (e.g. Ginormous Unicorn). 7 wins.
 function _countUnicorns(G, playerID) {
+    var effects = G.playerEffects[playerID] || [];
     return (G.stable[playerID] || []).reduce(function (sum, cardID) {
         var card = G.deck[cardID];
         if (!card || UNICORN_TYPES.indexOf(card.type) === -1) {
             return sum;
         }
-        return sum + (card.passive && card.passive.indexOf("count_as_two") !== -1 ? 2 : 1);
+        var countsAsTwo = (card.passive && card.passive.indexOf("count_as_two") !== -1) ||
+            effects.some(function (e) { return e.cardID === cardID && e.effect && e.effect.key === "count_as_two"; });
+        return sum + (countsAsTwo ? 2 : 1);
     }, 0);
 }
 // Only the lobby host (seat 0) may end the match for everyone. endIf picks this up.

@@ -281,15 +281,20 @@ function changeName(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, na
 const UNICORN_TYPES = ["baby", "basic", "unicorn", "narwhal"];
 
 // Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all
-// count; a card with the "count_as_two" passive counts twice). Reaching
-// CONSTANTS.stableSeats (7) wins.
+// count). A card counts twice if it has the "count_as_two" passive OR it granted
+// the player a "count_as_two" effect on entering (e.g. Ginormous Unicorn).
+// Reaching CONSTANTS.stableSeats (7) wins.
 export function _countUnicorns(G: UnstableUnicornsGame, playerID: PlayerID): number {
+    const effects = G.playerEffects[playerID] || [];
     return (G.stable[playerID] || []).reduce((sum, cardID) => {
         const card = G.deck[cardID];
         if (!card || UNICORN_TYPES.indexOf(card.type) === -1) {
             return sum;
         }
-        return sum + (card.passive && card.passive.indexOf("count_as_two") !== -1 ? 2 : 1);
+        const countsAsTwo =
+            (card.passive && card.passive.indexOf("count_as_two") !== -1) ||
+            effects.some(e => e.cardID === cardID && e.effect && e.effect.key === "count_as_two");
+        return sum + (countsAsTwo ? 2 : 1);
     }, 0);
 }
 
