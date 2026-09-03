@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import Client from './Client';
+import Landing from './Landing';
 
 const App = () => {
   return (
@@ -11,6 +12,9 @@ const App = () => {
           </Route>
           <Route path="/:matchID/:numPlayers/:playerID">
               <Client />
+          </Route>
+          <Route path="/">
+              <Landing />
           </Route>
         </Switch>
       </Router>
