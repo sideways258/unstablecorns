@@ -5,6 +5,7 @@ import { Card } from './game/card';
 import { UnstableUnicornsGame } from './game/game';
 import { PlayerID } from './game/player';
 import LobbyView from './ui/LobbyView';
+import { EXPANSION_PACKS } from './game/expansions';
 import { buildRoster } from './ui/lobbyRoster';
 import { COLORS } from './theme';
 
@@ -30,6 +31,15 @@ const BoardGameBegin = (props: Props) => {
     const numPlayers = props.G.players.length;
 
     const readyCount = props.G.players.filter((p) => props.G.ready[p.id] === true).length;
+
+    const isHost = String(props.playerID) === '0';
+    const enabledExpansions = props.G.expansions || [];
+    const toggleExpansion = (id: string, on: boolean) => {
+        const next = on
+            ? enabledExpansions.concat([id])
+            : enabledExpansions.filter((x) => x !== id);
+        props.moves.setExpansions(next);
+    };
 
     const roster = buildRoster({
         seatIds: props.G.players.map((p) => String(p.id)),
@@ -65,6 +75,10 @@ const BoardGameBegin = (props: Props) => {
                 setNameSaved(true);
             }}
             nameSaved={nameSaved}
+            expansionPacks={EXPANSION_PACKS}
+            enabledExpansions={enabledExpansions}
+            isHost={isHost}
+            onToggleExpansion={toggleExpansion}
             isReady={isReady}
             onReadyClick={() => props.moves.ready(props.playerID)}
             readyDisabled={!hasPick}

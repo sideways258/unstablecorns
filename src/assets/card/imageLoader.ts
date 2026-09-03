@@ -12,10 +12,15 @@ const ImageLoader = {
         return require.context('./square', true).keys().length;
     },
     load: (key: string) => {
-        if (key === "back") {
+        if (key === "back" || !key) {
             return BACK;
         }
-        return require(`./square/${key}.png`).default;
+        try {
+            // dynamic require: unknown keys throw at runtime -> fall back to the card back
+            return require(`./square/${key}.png`).default;
+        } catch (e) {
+            return BACK;
+        }
     },
     icon: (type: CardType) => {
         switch(type) {

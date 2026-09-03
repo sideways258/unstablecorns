@@ -1,4 +1,4 @@
-import { ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 
@@ -6,99 +6,90 @@ type Props = {
     color: string;
     text: string;
     text2?: string;
-    offset: { x: number, y: number };
-    position: "top" | "bottom";
+    // kept for call-site compatibility; the panel is now docked to the left edge
+    offset?: { x: number, y: number };
+    position?: "top" | "bottom";
     scale?: number;
     children?: ReactNode;
     title?: string;
 }
 
-// The tooltip is portalled to <body> and positioned in viewport space, clamped
-// so it's always fully on screen. This keeps it from being clipped by the board's
-// `overflow: hidden` / the scaled board container.
+// Docked to the left edge of the screen (portalled to <body>) so the description
+// never covers the cards and never blocks clicking them (`pointer-events: none`).
 const CardHover = (props: Props) => {
-    const anchorRef = useRef<HTMLSpanElement>(null);
-    const boxRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState<{ left: number, top: number } | null>(null);
-
-    useLayoutEffect(() => {
-        const a = anchorRef.current;
-        if (!a) return;
-        const r = a.getBoundingClientRect();
-        const b = boxRef.current;
-        const bw = b ? b.offsetWidth : 300;
-        const bh = b ? b.offsetHeight : 180;
-        const margin = 8;
-
-        let left = r.left + props.offset.x;
-        let top = (props.position === "top" ? r.top : r.bottom) + props.offset.y;
-
-        left = Math.min(Math.max(margin, left), window.innerWidth - bw - margin);
-        top = Math.min(Math.max(margin, top), window.innerHeight - bh - margin);
-
-        setPos(prev => (prev && prev.left === left && prev.top === top) ? prev : { left, top });
-    });
-
-    const tooltip = (
-        <Fixed
-            ref={boxRef}
-            style={{
-                left: pos ? pos.left : -9999,
-                top: pos ? pos.top : -9999,
-                opacity: pos ? 1 : 0,
-                transform: props.scale ? `scale(${props.scale})` : undefined,
-            }}
-        >
-            <InnerWrapper color={props.color}>
-                {props.title &&
-                    <div style={{ fontSize: "1.35em", fontWeight: 700 }}>{props.title}</div>
-                }
-                <div>{props.text}</div>
-                <div>{props.children}</div>
-            </InnerWrapper>
-            {props.text2 &&
-                <InnerWrapper color={"#FFFFFF"} style={{ marginTop: "0.7em" }}>
-                    <div>{props.text2}</div>
-                </InnerWrapper>
-            }
-        </Fixed>
-    );
-
-    return (
+    return createPortal(
         <>
-            <span ref={anchorRef} style={{ position: "absolute", width: 0, height: 0, pointerEvents: "none" }} />
-            {createPortal(tooltip, document.body)}
-        </>
+            <Dock>
+                <InnerWrapper color={props.color}>
+                    {props.title && <Title>{props.title}</Title>}
+                    <Body>{props.text}</Body>
+                </InnerWrapper>
+                {props.text2 &&
+                    <InnerWrapper color={"#FFFFFF"} style={{ marginTop: "10px" }}>
+                        <Body>{props.text2}</Body>
+                    </InnerWrapper>
+                }
+            </Dock>
+            {props.children && <ActionDock>{props.children}</ActionDock>}
+        </>,
+        document.body
     );
 }
 
-const hoverIn = keyframes`
-    from { opacity: 0; transform: translateY(6px) scale(0.97); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+const slideIn = keyframes`
+    from { opacity: 0; transform: translate(-12px, -50%); }
+    to   { opacity: 1; transform: translate(0, -50%); }
 `;
 
-const Fixed = styled.div`
+const slideIn2 = keyframes`
+    from { opacity: 0; transform: translate(-50%, -46%); }
+    to   { opacity: 1; transform: translate(-50%, -50%); }
+`;
+
+const Dock = styled.div`
     position: fixed;
+    left: max(20px, env(safe-area-inset-left));
+    top: 44%;
+    transform: translateY(-50%);
+    width: min(360px, calc(100vw - 40px));
     z-index: 120000;
-    width: min(300px, calc(100vw - 16px));
-    transform-origin: top left;
-    transition: opacity 0.1s ease;
+    pointer-events: none;           /* clicks pass straight through to the cards */
+    animation: ${slideIn} 0.14s ease both;
 `;
 
 const InnerWrapper = styled.div<{ color: string }>`
     background-color: ${props => props.color};
-    border-radius: 16px;
-    padding: 16px 18px;
+    border-radius: 18px;
+    padding: 18px 20px;
     color: ${props => props.color === "#FFFFFF" ? "#111" : "white"};
     font-family: 'Fredoka', 'Open Sans', sans-serif;
-    font-size: 13px;
-    line-height: 1.4;
-    border: 2px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 5px 6px 0 2px rgba(0, 33, 58, 0.55), 0 18px 40px rgba(0, 0, 0, 0.45);
-    cursor: default;
-    animation: ${hoverIn} 0.12s ease both;
+    border: 3px solid rgba(255, 255, 255, 0.75);
+    box-shadow: 6px 8px 0 2px rgba(0, 33, 58, 0.55), 0 22px 50px rgba(0, 0, 0, 0.5);
+`;
 
-    & > div { word-break: break-word; }
+const Title = styled.div`
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 1.15;
+    margin-bottom: 6px;
+`;
+
+const Body = styled.div`
+    font-size: 16px;
+    line-height: 1.5;
+    word-break: break-word;
+`;
+
+/* the rare interactive accessory (e.g. a "confirm discard" popup) - centred and
+   clickable so it's still reachable now that the description is off to the side */
+const ActionDock = styled.div`
+    position: fixed;
+    left: 50%;
+    top: 58%;
+    transform: translate(-50%, -50%);
+    z-index: 120001;
+    pointer-events: auto;
+    animation: ${slideIn2} 0.14s ease both;
 `;
 
 export default CardHover;

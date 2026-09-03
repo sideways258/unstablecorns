@@ -88,6 +88,7 @@ var UnstableUnicorns = {
             countPlayedCardsInActionPhase: 0,
             clipboard: {},
             endGame: false,
+            expansions: [],
             babyStarter: [],
             ready: ready,
             uiHoverHandIndex: undefined,
@@ -158,7 +159,7 @@ var UnstableUnicorns = {
         },
         stages: {
             pregame: {
-                moves: { ready: ready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch }
+                moves: { ready: ready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions }
             },
             beginning: {
                 moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch }
@@ -172,6 +173,19 @@ var UnstableUnicorns = {
     }
 };
 function initializeGame(G, ctx) {
+    // If the host enabled any expansion packs, rebuild the deck from base + those
+    // packs and re-deal hands / draw pile. Card ids 0..12 stay the Baby Unicorns.
+    if (G.expansions && G.expansions.length > 0) {
+        var fullDeck_1 = card_1.initializeDeck(G.expansions);
+        var drawPile_1 = underscore_1["default"].shuffle(fullDeck_1).filter(function (c) { return c.type !== "baby"; }).map(function (c) { return c.id; });
+        G.players.forEach(function (pl) {
+            G.hand[pl.id] = underscore_1["default"].first(drawPile_1, constants_1.CONSTANTS.numberOfHandCardsAtStart);
+            drawPile_1 = underscore_1["default"].rest(drawPile_1, constants_1.CONSTANTS.numberOfHandCardsAtStart);
+        });
+        G.deck = fullDeck_1;
+        G.drawPile = drawPile_1;
+        G.discardPile = [];
+    }
     var a = [];
     for (var i = 0; i < 13; i++) {
         a.push(i);
@@ -187,6 +201,14 @@ function initializeGame(G, ctx) {
 }
 function changeName(G, ctx, protagonist, name) {
     G.players[parseInt(protagonist)].name = name;
+}
+// Host-only: choose which optional expansion packs are in play. Applied when the
+// game leaves the lobby (see initializeGame).
+function setExpansions(G, ctx, sets) {
+    if (ctx.playerID !== "0") {
+        return core_1.INVALID_MOVE;
+    }
+    G.expansions = Array.isArray(sets) ? sets.filter(function (s) { return typeof s === "string"; }) : [];
 }
 var UNICORN_TYPES = ["baby", "basic", "unicorn", "narwhal"];
 // Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all

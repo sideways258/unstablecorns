@@ -1,5 +1,6 @@
 import type { Do } from "./do";
 import type { Effect } from "./effect";
+import { EXPANSION_CARDS } from "./expansions";
 
 export type CardID = number;
 
@@ -13,7 +14,7 @@ export interface Card {
     description: {en: string, de: string};
 }
 
-interface CardDefinition {
+export interface CardDefinition {
     title: string;
     image: string;
     count: number;
@@ -21,6 +22,8 @@ interface CardDefinition {
     passive?: Passive[];
     type: CardType;
     description: {en: string, de: string};
+    /** undefined / "base" = always in the deck; anything else is an optional expansion pack id */
+    set?: string;
 }
 
 export type CardType = "downgrade" | "upgrade" | "basic" | "unicorn" | "narwhal" | "magic" | "baby" | "neigh" | "super_neigh";
@@ -2207,9 +2210,15 @@ const Cards: CardDefinition[] = [{
     }
 }];
 
-export function initializeDeck() {
+export function initializeDeck(enabledSets: string[] = []) {
     let deck: Card[] = [];
-    Cards.forEach(c => {
+    // base cards first (ids 0..12 are always the Baby Unicorns), then any enabled
+    // expansion packs appended after.
+    const defs: CardDefinition[] = [
+        ...Cards,
+        ...EXPANSION_CARDS.filter(c => c.set && enabledSets.indexOf(c.set) !== -1),
+    ];
+    defs.forEach(c => {
         for (let i=0; i<c.count; i++) {
             deck.push({
                 id: 0,

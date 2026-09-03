@@ -25,6 +25,12 @@ type Props = {
   readyDisabled?: boolean;
   readyHint?: string;
 
+  /** Optional expansion packs the host can toggle on. */
+  expansionPacks?: { id: string; name: string; blurb: string }[];
+  enabledExpansions?: string[];
+  isHost?: boolean;
+  onToggleExpansion?: (id: string, on: boolean) => void;
+
   /** Game-specific section (e.g. Unstable Unicorns baby-unicorn picker). */
   children?: ReactNode;
 };
@@ -90,6 +96,33 @@ const LobbyView = (props: Props) => {
             </Waiting>
           )}
         </Roster>
+
+        {props.expansionPacks && props.expansionPacks.length > 0 && (
+          <>
+            <PanelSubtitle>Expansion packs</PanelSubtitle>
+            <Packs>
+              {props.expansionPacks.map((pk) => {
+                const on = (props.enabledExpansions || []).indexOf(pk.id) !== -1;
+                return (
+                  <PackRow
+                    key={pk.id}
+                    type="button"
+                    $on={on}
+                    disabled={!props.isHost}
+                    onClick={() => props.onToggleExpansion && props.onToggleExpansion(pk.id, !on)}
+                  >
+                    <PackCheck $on={on}>{on ? '✓' : ''}</PackCheck>
+                    <span>
+                      <b>{pk.name}</b>
+                      <em>{pk.blurb}</em>
+                    </span>
+                  </PackRow>
+                );
+              })}
+            </Packs>
+            {!props.isHost && <Hint>Only the host can change these.</Hint>}
+          </>
+        )}
 
         <PanelSubtitle>Your name</PanelSubtitle>
         <InviteRow>
@@ -241,6 +274,63 @@ const StatusPill = styled.span<{ $tone: 'ready' | 'wait' | 'idle' }>`
       : p.$tone === 'wait'
       ? 'linear-gradient(135deg, #ffcf5c, #e0961a)'
       : 'rgba(255,255,255,0.16)'};
+`;
+
+const Packs = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+`;
+
+const PackRow = styled.button<{ $on: boolean }>`
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  padding: 0.6em 0.8em;
+  border-radius: 12px;
+  cursor: pointer;
+  background: ${(p) => (p.$on ? 'rgba(55,217,160,0.14)' : 'rgba(255,255,255,0.06)')};
+  border: 1px solid ${(p) => (p.$on ? '#37d9a0' : COLORS.panelBorder)};
+  transition: background 0.12s ease, border-color 0.12s ease;
+
+  & span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  & b {
+    font-family: ${FONT_DISPLAY};
+    font-weight: 700;
+    font-size: 11.5pt;
+  }
+  & em {
+    font-style: normal;
+    font-size: 9.5pt;
+    color: ${COLORS.textMuted};
+  }
+  &:disabled {
+    cursor: default;
+    opacity: 0.85;
+  }
+`;
+
+const PackCheck = styled.span<{ $on: boolean }>`
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #06301f;
+  background: ${(p) => (p.$on ? '#37d9a0' : 'rgba(255,255,255,0.12)')};
+  border: 1.5px solid ${(p) => (p.$on ? '#37d9a0' : COLORS.panelBorder)};
 `;
 
 const Waiting = styled.div`

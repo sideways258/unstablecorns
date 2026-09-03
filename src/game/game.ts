@@ -30,6 +30,7 @@ export interface UnstableUnicornsGame extends Game {
     neighDiscussion?: NeighDiscussion;
     clipboard: {[key: string]: any};
     endGame: boolean;
+    expansions: string[];
     babyStarter: { cardID: CardID, owner: PlayerID }[];
     ready: { [key: string]: boolean };
     uiHoverHandIndex: number | undefined;
@@ -145,6 +146,7 @@ const UnstableUnicorns = {
             countPlayedCardsInActionPhase: 0,
             clipboard: {},
             endGame: false,
+            expansions: [],
             babyStarter: [],
             ready,
             uiHoverHandIndex: undefined,
@@ -218,7 +220,7 @@ const UnstableUnicorns = {
         },
         stages: {
             pregame: {
-                moves: { ready, selectBaby, changeName, endMatch }
+                moves: { ready, selectBaby, changeName, endMatch, setExpansions }
             },
             beginning: {
                 moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch }
@@ -233,6 +235,21 @@ const UnstableUnicorns = {
 }
 
 function initializeGame(G: UnstableUnicornsGame, ctx: Ctx) {
+    // If the host enabled any expansion packs, rebuild the deck from base + those
+    // packs and re-deal hands / draw pile. Card ids 0..12 stay the Baby Unicorns
+    // so babyStarter picks and the nursery logic below still line up.
+    if (G.expansions && G.expansions.length > 0) {
+        const fullDeck = initializeDeck(G.expansions);
+        let drawPile = _.shuffle(fullDeck).filter(c => c.type !== "baby").map(c => c.id);
+        G.players.forEach(pl => {
+            G.hand[pl.id] = _.first(drawPile, CONSTANTS.numberOfHandCardsAtStart);
+            drawPile = _.rest(drawPile, CONSTANTS.numberOfHandCardsAtStart);
+        });
+        G.deck = fullDeck;
+        G.drawPile = drawPile;
+        G.discardPile = [];
+    }
+
     let a: number[] = [];
     for (let i=0; i<13; i++) {
         a.push(i);
@@ -246,6 +263,15 @@ function initializeGame(G: UnstableUnicornsGame, ctx: Ctx) {
     a.forEach(cardId => {
         G.nursery.push(cardId);
     })
+}
+
+// Host-only: choose which optional expansion packs are in play. Applied when the
+// game leaves the lobby (see initializeGame).
+function setExpansions(G: UnstableUnicornsGame, ctx: Ctx, sets: string[]) {
+    if (ctx.playerID !== "0") {
+        return INVALID_MOVE;
+    }
+    G.expansions = Array.isArray(sets) ? sets.filter(s => typeof s === "string") : [];
 }
 
 function changeName(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, name: string) {
