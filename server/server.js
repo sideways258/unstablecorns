@@ -42,14 +42,16 @@ var serve = require('koa-static');
 var Server = require('boardgame.io/server').Server;
 var game_1 = require("./game/game");
 var server = Server({ games: [game_1["default"]] });
-var PORT = process.env.PORT == null ? 8000 : parseInt(process.env.PORT);
+// Single listening port for everything: static front-end, game WebSocket, and
+// the boardgame.io lobby REST API are all mounted on this one server. Do NOT
+// set lobbyConfig.apiPort here -- that forks the lobby API onto a second port,
+// which collides with PORT and breaks single-port deploys (Docker/Unraid/Heroku).
+var PORT = process.env.PORT == null ? 8090 : parseInt(process.env.PORT, 10);
 var frontEndAppBuildPath = path.resolve(__dirname, '../build');
 server.app.use(serve(frontEndAppBuildPath));
-var lobbyConfig = {
-    apiPort: process.env.LOBBY_PORT == null ? 8090 : parseInt(process.env.LOBBY_PORT),
-    apiCallback: function () { return console.log('Running Lobby API on port ' + (process.env.LOBBY_PORT || 8090) + '...'); }
-};
-server.run({ port: PORT, lobbyConfig: lobbyConfig }, function () {
+server.run({ port: PORT }, function () {
+    // SPA fallback: serve build/index.html for any route the static handler missed
+    // (e.g. deep links like /<matchID>/<numPlayers>/<playerID>).
     server.app.use(function (ctx, next) { return __awaiter(void 0, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
@@ -58,4 +60,5 @@ server.run({ port: PORT, lobbyConfig: lobbyConfig }, function () {
             }
         });
     }); });
+    console.log('Unstable Unicorns server (front-end + game + lobby API) listening on port ' + PORT);
 });

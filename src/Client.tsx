@@ -35,7 +35,9 @@ const UnstableUnicornsClient = ({ debug }: Props) => {
             board: Board,
             numPlayers: parseInt(numPlayers),
             //multiplayer: SocketIO({ server: `localhost:8000` }),
-            multiplayer: SocketIO({ server: `https://${window.location.hostname}` }),
+            // Connect back to whatever host/port/protocol the page was served from,
+            // so it works on http://<unraid-ip>:8090 as well as behind an https proxy.
+            multiplayer: SocketIO({ server: `${window.location.protocol}//${window.location.host}` }),
         });
     } else {
         return (<h1>Num players argument is missing</h1>);

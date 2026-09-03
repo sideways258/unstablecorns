@@ -2,4 +2,6 @@
 **/npm-debug.log
 .git
 .github
+build
+server_build
 *.md

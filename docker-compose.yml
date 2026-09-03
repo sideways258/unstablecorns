@@ -1,15 +1,14 @@
 services:
-  devils-in-the-details:
-    # Pulls the image GitHub Actions builds and publishes automatically on every push to main.
-    # Replace YOUR-GITHUB-USERNAME and YOUR-REPO-NAME below.
+  unstablecorns:
+    # Pulls the image GitHub Actions builds and publishes on every push to main.
     image: ghcr.io/sideways258/unstablecorns:latest
     container_name: unstablecorns
     restart: unless-stopped
     environment:
       - PORT=8090
     ports:
-      - "8088:8090"   # host 8088 -> container 8080 (Node server); change 8088 to any free port
-    # The game's multiplayer uses WebSockets on this same port — if you put this
+      - "8090:8090"   # host 8090 -> container 8090; change the left number to use a different host port
+    # The game's multiplayer uses WebSockets on this same port -- if you put this
     # behind a reverse proxy, make sure it forwards Upgrade/Connection headers.
 
 # --- Alternative: build locally from the repo instead of pulling from GHCR ---
