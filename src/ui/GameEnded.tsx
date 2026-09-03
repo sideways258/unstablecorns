@@ -1,6 +1,7 @@
 import styled, { keyframes } from 'styled-components';
 import { Screen, Panel, PanelTitle, Button } from './themed';
 import BackButton from './BackButton';
+import { highlightNames } from './highlightNames';
 import { COLORS } from '../theme';
 
 type Props = {
@@ -8,6 +9,8 @@ type Props = {
   message?: string;
   /** big emoji at the top */
   icon?: string;
+  /** player names to highlight in the title / message */
+  names?: string[];
 };
 
 // Shown to every player when a match ends (host ended it, or a win condition).
@@ -15,13 +18,14 @@ const GameEnded = ({
   title = 'Game over',
   message = 'The host ended the game. Thanks for playing!',
   icon = '🎉',
+  names = [],
 }: Props) => (
   <Screen>
     <BackButton />
     <Panel style={{ textAlign: 'center' }}>
       <BigIcon>{icon}</BigIcon>
-      <PanelTitle>{title}</PanelTitle>
-      <p style={{ color: COLORS.textMuted }}>{message}</p>
+      <PanelTitle>{highlightNames(title, names)}</PanelTitle>
+      <p style={{ color: COLORS.textMuted }}>{highlightNames(message, names)}</p>
       <Button onClick={() => window.location.assign('/')}>Back to home</Button>
     </Panel>
   </Screen>

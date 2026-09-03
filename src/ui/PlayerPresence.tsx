@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { FONT_DISPLAY } from '../theme';
 
 type Seat = { id: number | string; name?: string; isConnected?: boolean };
-type Toast = { key: number; text: string; kind: 'left' | 'back' };
+type Toast = { key: number; name: string; kind: 'left' | 'back' };
 
 // Watches the per-seat connection info boardgame.io passes to the board and pops
 // a toast when someone drops out of / rejoins the room. Rendered once, alongside
@@ -47,10 +47,10 @@ const PlayerPresence = (props: any) => {
       const now = current[id];
       if (was === now || id === myId) return;
       if (was === true && now === false) {
-        fresh.push({ key: nextKey.current++, text: `${nameFor(id)} left the room`, kind: 'left' });
+        fresh.push({ key: nextKey.current++, name: nameFor(id), kind: 'left' });
       } else if (was === false && now === true && everConnected.current.has(id)) {
         // only "reconnected" if we saw them connected in an earlier frame
-        fresh.push({ key: nextKey.current++, text: `${nameFor(id)} reconnected`, kind: 'back' });
+        fresh.push({ key: nextKey.current++, name: nameFor(id), kind: 'back' });
       }
     });
 
@@ -86,7 +86,8 @@ const PlayerPresence = (props: any) => {
             <span role="img" aria-label={t.kind === 'left' ? 'wave' : 'plug'}>
               {t.kind === 'left' ? '👋' : '🔌'}
             </span>
-            {t.text}
+            <ToastName>{t.name}</ToastName>
+            <span>{t.kind === 'left' ? 'left the room' : 'reconnected'}</span>
           </ToastPill>
         ))}
       </AnimatePresence>
@@ -127,10 +128,18 @@ const ToastPill = styled(motion.div)<{ $kind: 'left' | 'back' }>`
       ? 'linear-gradient(135deg, #ff6b6b, #c81d25)'
       : 'linear-gradient(135deg, #4ade80, #148f4b)'};
 
-  & > span {
-    font-size: 1.1em;
+  & > span[role='img'] {
+    font-size: 1.15em;
     line-height: 1;
   }
+`;
+
+const ToastName = styled.b`
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.24);
+  padding: 1px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
 `;
 
 export default PlayerPresence;

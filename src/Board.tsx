@@ -36,6 +36,7 @@ import TurnIndicator from './ui/TurnIndicator';
 import CancelActionButton from './ui/CancelActionButton';
 import UpgradeDowngradeTarget from './ui/UpgradeDowngradeTarget';
 import StableInspector from './ui/StableInspector';
+import TargetPrompt from './ui/TargetPrompt';
 
 const YourTurnSound = require('./assets/sound/ALERT_YourTurn_0v2.ogg').default;
 const DrawCardSound = require('./assets/sound/draw_card_and_add_to_hand_1.ogg').default;
@@ -300,22 +301,55 @@ const Board = (props: any) => {
         setCardInteraction(undefined);
         setC2CArrow(undefined);
         setHoverTargets(undefined);
+        setShowStableOf(undefined);
         cancellableStates.forEach((b: BoardState) => moves.skipExecuteDo(playerID, (b as any).info.instructionID));
+    };
+
+    // A magic card is waiting for a card-in-a-stable to be targeted. Flow:
+    // click a player's stable -> StableInspector opens in "pick a target" mode.
+    const STABLE_TARGET_TYPES = [
+        "steal__cardToCard", "destroy__cardToCard", "destroy__click_on_card_in_stable",
+        "sacrifice__cardToCard", "sacrifice__clickOnCardInStable", "returnToHand__cardToCard",
+        "move__cardToCard", "backKick__card_to_card", "unicornswap1", "unicornswap2",
+    ];
+    let stableTargeting: { instructionID: string; targetCardIDs: CardID[] } | undefined = undefined;
+    if (cardInteraction?.key === "card_to_card") {
+        stableTargeting = {
+            instructionID: cardInteraction.info.instructionID,
+            targetCardIDs: cardInteraction.info.targets.map(t => t.cardID),
+        };
+    } else {
+        const st = boardStates.find(b => STABLE_TARGET_TYPES.indexOf(b.type) !== -1 && (b as any).info?.targets);
+        if (st) {
+            stableTargeting = {
+                instructionID: (st as any).info.instructionID,
+                targetCardIDs: ((st as any).info.targets as { cardID: CardID }[]).map(t => t.cardID),
+            };
+        }
+    }
+    const pickStableTarget = (cardID: CardID) => {
+        if (!stableTargeting) return;
+        moves.executeDo(stableTargeting.instructionID, { protagonist: playerID, cardID });
+        setCardInteraction(undefined);
+        moves.setUICardToCard(undefined);
+        setShowStableOf(undefined);
     };
 
     if (ctx.gameover) {
         const winner: string | undefined = ctx.gameover.winner;
+        const allNames = G.players.map(p => p.name);
         if (winner !== undefined) {
             const wonName = (G.players[parseInt(winner, 10)] && G.players[parseInt(winner, 10)].name) || `Player ${winner}`;
             return (
                 <GameEnded
                     icon="🏆"
+                    names={allNames}
                     title={winner === playerID ? 'You win! 🦄' : `${wonName} wins!`}
                     message={`${wonName} filled their stable with ${CONSTANTS.stableSeats} unicorns.`}
                 />
             );
         }
-        return <GameEnded />;
+        return <GameEnded names={allNames} />;
     }
 
     if (ctx.phase === "pregame") {
@@ -357,9 +391,12 @@ const Board = (props: any) => {
               unicornCount={_countUnicorns(G, showStableOf)}
               stable={[...G.stable[showStableOf], ...G.temporaryStable[showStableOf]].map(c => G.deck[c])}
               upgradeDowngrade={G.upgradeDowngradeStable[showStableOf].map(c => G.deck[c])}
+              targetCardIDs={stableTargeting ? stableTargeting.targetCardIDs : undefined}
+              onPickTarget={stableTargeting ? pickStableTarget : undefined}
               onClose={() => setShowStableOf(undefined)}
             />
           )}
+          {stableTargeting && showStableOf === undefined && <TargetPrompt />}
           <BoardShell>
             <Wrapper layout onMouseMove={wrapperOnMouseMove}>
                 <div style={{ position: "absolute", right: 0, color: "rgba(0,0,0,0)", height: "20px", width: "20px" }} onClick={() => {
@@ -478,27 +515,28 @@ const Board = (props: any) => {
                         highlightMode={stableHighlightMode}
                         onHandClick={playerID => setShowPlayerHand(playerID)}
                         onStableCardClick={cardID => {
+                            const cardOwner = G.players.find(p =>
+                                G.stable[p.id].indexOf(cardID) !== -1 ||
+                                G.temporaryStable[p.id].indexOf(cardID) !== -1 ||
+                                G.upgradeDowngradeStable[p.id].indexOf(cardID) !== -1
+                            );
                             if (cardInteraction?.key === "click_on_other_stable_card" || cardInteraction?.key === "card_to_card") {
-                                console.log("Detected click for cardInteraction with key <click_on_other_stable_card | card_to_card>");
-                                // is clicked card a valid target?
+                                // valid target -> execute; otherwise open that stable to pick
                                 if (cardInteraction.info.targets.find(s => s.cardID === cardID)) {
-                                    console.log(`Clicked card is a valid target. Execute instruction with id <${cardInteraction.info.instructionID}>`);
                                     moves.executeDo(cardInteraction.info.instructionID, {
                                         protagonist: playerID, cardID
                                     });
                                     setCardInteraction(undefined);
                                     moves.setUICardToCard(undefined)
+                                } else if (cardOwner && cardOwner.id !== playerID) {
+                                    setShowStableOf(cardOwner.id);
                                 }
-                            } else if (cardInteraction === undefined) {
+                            } else if (stableTargeting && cardOwner && cardOwner.id !== playerID) {
+                                // a magic card is waiting for a target -> open that stable
+                                setShowStableOf(cardOwner.id);
+                            } else if (cardInteraction === undefined && cardOwner && cardOwner.id !== playerID) {
                                 // idle -> peek at the owner's stable
-                                const owner = G.players.find(p =>
-                                    G.stable[p.id].indexOf(cardID) !== -1 ||
-                                    G.temporaryStable[p.id].indexOf(cardID) !== -1 ||
-                                    G.upgradeDowngradeStable[p.id].indexOf(cardID) !== -1
-                                );
-                                if (owner && owner.id !== playerID) {
-                                    setShowStableOf(owner.id);
-                                }
+                                setShowStableOf(cardOwner.id);
                             }
                         }}
                         onStableCardMouseEnter={cardID => {
@@ -537,7 +575,8 @@ const Board = (props: any) => {
                                 moves.playUpgradeDowngradeCard(playerID, plid, cardInteraction.info.cardID);
                                 setCardInteraction(undefined);
                             } else {
-                                // no interaction in progress -> just peek at their stable
+                                // open their stable: to pick a target if a magic card is
+                                // waiting for one, otherwise just to look
                                 setShowStableOf(plid);
                             }
                         }}
@@ -897,7 +936,7 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
 
     return (
         <NeighLabelWrapper>
-            <NeighLabel card={G.deck[G.neighDiscussion.cardID]} originalInitiatorName={originalInitiatorName} targetName={targetName} newInitiatorName={newInitiatorName} role={role} didVote={didVote} numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length} showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined} onPlayNeighClick={onPlayNeighClick} onDontPlayNeighClick={onDontPlayNeighClick} />
+            <NeighLabel card={G.deck[G.neighDiscussion.cardID]} originalInitiatorName={originalInitiatorName} targetName={targetName} playerNames={G.players.map(p => p.name)} newInitiatorName={newInitiatorName} role={role} didVote={didVote} numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length} showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined} onPlayNeighClick={onPlayNeighClick} onDontPlayNeighClick={onDontPlayNeighClick} />
         </NeighLabelWrapper>
     );
 }

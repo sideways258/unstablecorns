@@ -32,10 +32,12 @@ const MockBoard = (props: Props) => {
 
   if (ctx.gameover) {
     const winner = ctx.gameover.winner;
+    const wonName = winner !== undefined ? G.names[winner] || `Player ${winner}` : undefined;
     return (
       <GameEnded
         icon={winner !== undefined ? '🏆' : '🚪'}
-        title={winner !== undefined ? `Player ${winner} wins!` : 'Game over'}
+        names={Object.keys(G.names).map((k) => G.names[k]).filter(Boolean)}
+        title={wonName !== undefined ? `${wonName} wins!` : 'Game over'}
         message={winner !== undefined ? 'They emptied their hand first.' : 'The host ended the game.'}
       />
     );

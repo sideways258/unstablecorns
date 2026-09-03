@@ -15,10 +15,17 @@ const TurnIndicator = ({ currentName, isYou }: Props) =>
       <span role="img" aria-label="dice">
         🎲
       </span>
-      {isYou ? 'Your turn!' : `${currentName}'s turn`}
+      {isYou ? 'Your turn!' : <><Who>{currentName}</Who>&rsquo;s turn</>}
     </Pill>,
     document.body
   );
+
+const Who = styled.b`
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.22);
+  padding: 1px 7px;
+  border-radius: 6px;
+`;
 
 const pulse = keyframes`
   0%, 100% { box-shadow: 0 6px 0 rgba(0,0,0,0.28), 0 0 0 0 rgba(55,217,160,0.5); }

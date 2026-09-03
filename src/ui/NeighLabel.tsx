@@ -4,6 +4,7 @@ import styled, { keyframes } from 'styled-components';
 import ImageLoader from '../assets/card/imageLoader';
 import { Card, CardID } from '../game/card';
 import CardHover from './CardHover';
+import { highlightNames } from './highlightNames';
 import { motion } from 'framer-motion';
 import { _typeToColor } from './util';
 import useSound from '../audio';
@@ -18,6 +19,8 @@ type Props = {
     originalInitiatorName: string;
     /** Name of the player whose stable the card is going into (if not the initiator's own). */
     targetName?: string;
+    /** All player names, so any that appear in the text get highlighted. */
+    playerNames?: string[];
     newInitiatorName?: string;
     numberOfNeighedCards: number;
     didVote: boolean;
@@ -39,6 +42,9 @@ const NeighLabel = (props: Props) => {
     const context = useContext(LanguageContext)
 
     const onText = props.targetName && props.targetName !== props.originalInitiatorName ? ` on ${props.targetName}` : "";
+    const names = props.playerNames && props.playerNames.length > 0
+        ? props.playerNames
+        : [props.originalInitiatorName, props.newInitiatorName, props.targetName].filter((n): n is string => !!n);
 
     let text = "";
     if (props.role === "original_initiator") {
@@ -87,16 +93,17 @@ const NeighLabel = (props: Props) => {
                 </CardWrap>
 
                 <Text>
-                    <div>{text}</div>
+                    <div>{highlightNames(text, names)}</div>
                     {props.numberOfNeighedCards % 2 === 1 && (
                         <div>
-                            Result: {props.originalInitiatorName} <span style={{ color: '#ff8a8a' }}>is stopped from playing</span>{' '}
-                            {props.card.title}.
+                            Result: {highlightNames(props.originalInitiatorName, names)}{' '}
+                            <span style={{ color: '#ff8a8a' }}>is stopped from playing</span> {props.card.title}.
                         </div>
                     )}
                     {props.numberOfNeighedCards % 2 === 0 && (
                         <div>
-                            Result: {props.originalInitiatorName} <span style={{ color: '#8affb0' }}>can play</span> {props.card.title}.
+                            Result: {highlightNames(props.originalInitiatorName, names)}{' '}
+                            <span style={{ color: '#8affb0' }}>can play</span> {props.card.title}.
                         </div>
                     )}
                 </Text>

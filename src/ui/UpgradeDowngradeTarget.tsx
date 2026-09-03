@@ -16,10 +16,10 @@ type Props = {
 
 // Choose whose stable an Upgrade / Downgrade card goes into. Portalled so every
 // player, whatever their seat or the board layout, has a clear way to place it.
-// Upgrades go on your own stable; Downgrades go on another player's.
+// Any player can be chosen, including yourself.
 const UpgradeDowngradeTarget = ({ card, self, others, onPick, onCancel }: Props) => {
   const isUpgrade = card.type === 'upgrade';
-  const targets: Seat[] = isUpgrade ? [self] : others;
+  const targets: Seat[] = [self, ...others];
 
   return createPortal(
     <Backdrop>
@@ -29,14 +29,13 @@ const UpgradeDowngradeTarget = ({ card, self, others, onPick, onCancel }: Props)
           <div>
             <Kind $up={isUpgrade}>{isUpgrade ? 'Upgrade' : 'Downgrade'}</Kind>
             <h2>{card.title}</h2>
-            <p>{isUpgrade ? 'Place it in a stable:' : "Place it in another player's stable:"}</p>
+            <p>Whose stable should it go into?</p>
           </div>
         </Head>
 
         <Targets>
-          {targets.length === 0 && <Empty>No valid target.</Empty>}
           {targets.map((t) => (
-            <TargetButton key={t.id} onClick={() => onPick(t.id)}>
+            <TargetButton key={t.id} $me={t.id === self.id} onClick={() => onPick(t.id)}>
               {t.id === self.id ? 'My stable' : t.name}
             </TargetButton>
           ))}
@@ -115,11 +114,12 @@ const Targets = styled.div`
   margin: 18px 0 14px;
 `;
 
-const TargetButton = styled.button`
+const TargetButton = styled.button<{ $me?: boolean }>`
   padding: 0.9em 1em;
   border-radius: 12px;
   border: 2px solid #fff;
-  background: linear-gradient(135deg, #7c5cff, #ff5c8a);
+  background: ${(p) =>
+    p.$me ? 'linear-gradient(135deg, #ffd166, #e0961a)' : 'linear-gradient(135deg, #7c5cff, #ff5c8a)'};
   color: #fff;
   font-family: ${FONT_DISPLAY};
   font-weight: 700;
@@ -147,11 +147,6 @@ const CancelButton = styled.button`
   font-weight: 600;
   font-size: 11pt;
   cursor: pointer;
-`;
-
-const Empty = styled.div`
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 11pt;
 `;
 
 export default UpgradeDowngradeTarget;
