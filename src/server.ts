@@ -6,13 +6,16 @@ import UnstableUnicorns from './game/game';
 
 
 const server = Server({ games: [UnstableUnicorns] });
-const PORT = process.env.PORT == null ? 8000 : parseInt(process.env.PORT);
+const lobbyConfig = {
+  apiPort: process.env.LOBBY_PORT == null ? 8090 : parseInt(process.env.LOBBY_PORT),
+  apiCallback: () => console.log(`Running Lobby API on port ${process.env.LOBBY_PORT || 8090}...`),
+};
 
 const frontEndAppBuildPath = path.resolve(__dirname, '../build');
 server.app.use(serve(frontEndAppBuildPath))
 
 const lobbyConfig = {
-  apiPort: 8080,
+  apiPort: 8090,
   apiCallback: () => console.log('Running Lobby API on port 8080...'),
 };
 
