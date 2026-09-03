@@ -1,4 +1,5 @@
 import type { Game, Ctx } from 'boardgame.io';
+import { INVALID_MOVE } from 'boardgame.io/core';
 import type { Player, PlayerID } from './player';
 import type { CardID, Card, CardUI, OnEnterAddEffect } from './card';
 import { canEnter, Do, enter, _findInstructionWithID } from './do';
@@ -81,6 +82,14 @@ export interface Instruction {
 
 const UnstableUnicorns = {
     name: "unstable_unicorns",
+    // Ends the whole match the moment the host asks for it (see the endMatch move).
+    endIf: (G: UnstableUnicornsGame, ctx: Ctx) => {
+        if (G.endGame) {
+            return { endedByHost: true };
+        }
+    },
+    // Available in every phase/stage so the host can always bail out.
+    moves: { endMatch },
     setup: (ctx: Ctx, setupData: any): UnstableUnicornsGame => {
         const players: Player[] = Array.from({ length: ctx.numPlayers }, (val, idx) => {
             return {
@@ -199,14 +208,14 @@ const UnstableUnicorns = {
         },
         stages: {
             pregame: {
-                moves: { ready, selectBaby, changeName }
+                moves: { ready, selectBaby, changeName, endMatch }
             },
             beginning: {
-                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard }
+                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch }
             },
             action_phase: {
                 moves: {
-                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard
+                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch
                 }
             }
         }
@@ -231,6 +240,14 @@ function initializeGame(G: UnstableUnicornsGame, ctx: Ctx) {
 
 function changeName(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, name: string) {
     G.players[parseInt(protagonist)].name = name;
+}
+
+// Only the lobby host (seat 0) may end the match for everyone. endIf picks this up.
+function endMatch(G: UnstableUnicornsGame, ctx: Ctx) {
+    if (ctx.playerID !== "0") {
+        return INVALID_MOVE;
+    }
+    G.endGame = true;
 }
 
 function ready(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {

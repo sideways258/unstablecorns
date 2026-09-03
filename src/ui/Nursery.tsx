@@ -5,7 +5,7 @@ import ImageLoader from '../assets/card/imageLoader';
 import { _typeToColor } from './util';
 import { useContext, useState } from 'react';
 import CardHover from './CardHover';
-import useSound from 'use-sound';
+import useSound from '../audio';
 import { LanguageContext } from '../LanguageContextProvider';
 import { cardDescription } from '../BoardUtil';
 const HubMouseOverSound = require('../assets/sound/Hub_Mouseover.ogg').default;

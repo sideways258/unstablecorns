@@ -4,7 +4,7 @@ import Hand from './ui/Hand';
 import HiddenHand from './ui/HiddenHand';
 import Stable, { StableHandle } from './ui/Stable';
 import PlayerField, { PlayerFieldHandle } from './ui/PlayerField';
-import useSound from 'use-sound';
+import useSound from './audio';
 import { motion, AnimateSharedLayout, AnimatePresence } from "framer-motion";
 // game
 import { UnstableUnicornsGame, Ctx, _findOpenScenesWithProtagonist, Instruction, Scene, canDraw, canPlayCard, _findInProgressScenesWithProtagonist, _findInstruction } from './game/game';
@@ -30,6 +30,8 @@ import Finder from './ui/Finder';
 import BoardGameBegin from './BoardGameBegin';
 import React from 'react';
 import { LanguageContext } from './LanguageContextProvider';
+import SettingsMenu from './ui/SettingsMenu';
+import GameEnded from './ui/GameEnded';
 
 const YourTurnSound = require('./assets/sound/ALERT_YourTurn_0v2.ogg').default;
 const DrawCardSound = require('./assets/sound/draw_card_and_add_to_hand_1.ogg').default;
@@ -283,15 +285,26 @@ const Board = (props: any) => {
         }
     }, [G.uiCardToCard?.id]);
 
+    const isHost = playerID === "0";
+    const handleEndGame = () => moves.endMatch();
+
+    if (ctx.gameover) {
+        return <GameEnded />;
+    }
+
     if (ctx.phase === "pregame") {
         return (
-            <BoardGameBegin G={G} babyCards={_.first(G.deck, 13)} playerID={playerID} moves={moves} />
+            <>
+                <BoardGameBegin G={G} babyCards={_.first(G.deck, 13)} playerID={playerID} moves={moves} matchID={props.matchID} />
+                <SettingsMenu isHost={isHost} onEndGame={handleEndGame} />
+            </>
         );
     }
 
     return (
         <AnimateSharedLayout>
             <Wrapper layout onMouseMove={wrapperOnMouseMove}>
+                <SettingsMenu isHost={isHost} onEndGame={handleEndGame} />
                 <div style={{ position: "absolute", right: 0, color: "rgba(0,0,0,0)", height: "20px", width: "20px" }} onClick={() => {
                     moves.end(playerID);
                     /*

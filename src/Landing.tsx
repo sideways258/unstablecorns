@@ -1,46 +1,90 @@
-import { useState } from "react";
-import { useHistory } from "react-router-dom";
+import { useState, FormEvent } from 'react';
+import { useHistory } from 'react-router-dom';
+import { Screen, Panel, PanelTitle, PanelSubtitle, Field, Select, Button, Row, Label } from './ui/themed';
+import { generateLobbyCode, isValidLobbyCode } from './theme';
 
-// Shown at "/" (and any non-game URL). Also doubles as a deploy sanity check:
-// if you can see this page, the front-end build is being served correctly.
+const PLAYER_COUNTS = [2, 3, 4, 5, 6, 7, 8];
+
+// Shown at "/". Themed like the board. Also a deploy sanity check: if you can
+// see this, the front-end build is being served correctly.
 const Landing = () => {
   const history = useHistory();
-  const [matchID, setMatchID] = useState("hello-world");
-  const [numPlayers, setNumPlayers] = useState("6");
-  const [playerID, setPlayerID] = useState("0");
 
-  const go = (e: React.FormEvent) => {
-    e.preventDefault();
-    history.push(`/${encodeURIComponent(matchID || "hello-world")}/${numPlayers}/${playerID}`);
+  const [createCount, setCreateCount] = useState('4');
+  const [joinCode, setJoinCode] = useState('');
+  const [joinCount, setJoinCount] = useState('4');
+  const [joinError, setJoinError] = useState('');
+
+  const createLobby = () => {
+    const code = generateLobbyCode();
+    // Host lands on the seat picker for the new lobby (they take seat 0).
+    history.push(`/${code}/${createCount}`);
   };
 
-  const shareBase = `${window.location.origin}/${matchID || "hello-world"}/${numPlayers}`;
+  const joinLobby = (e: FormEvent) => {
+    e.preventDefault();
+    const code = joinCode.trim();
+    if (!isValidLobbyCode(code)) {
+      setJoinError('Enter the 6-digit code from the host.');
+      return;
+    }
+    history.push(`/${code}/${joinCount}`);
+  };
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", maxWidth: 560, margin: "10vh auto", padding: "0 20px", lineHeight: 1.5 }}>
-      <h1>Unstable Unicorns</h1>
-      <p>Enter a match name, pick the player count, and choose which seat you are (0-based).</p>
-      <form onSubmit={go} style={{ display: "grid", gap: 12, margin: "24px 0" }}>
-        <label>Match name
-          <input value={matchID} onChange={e => setMatchID(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 4 }} />
-        </label>
-        <label>Number of players
-          <select value={numPlayers} onChange={e => setNumPlayers(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 4 }}>
-            {[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </label>
-        <label>Your player ID
-          <select value={playerID} onChange={e => setPlayerID(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 4 }}>
-            {Array.from({ length: parseInt(numPlayers, 10) }, (_, i) => <option key={i} value={i}>{i}</option>)}
-          </select>
-        </label>
-        <button type="submit" style={{ padding: 10, cursor: "pointer" }}>Join game</button>
-      </form>
-      <p style={{ fontSize: 14, color: "#666" }}>
-        Share with friends &mdash; each person opens the same link with a different player ID:<br />
-        <code>{shareBase}/PLAYER_ID</code>
-      </p>
-    </div>
+    <Screen>
+      <Panel>
+        <PanelTitle>Unstable Unicorns</PanelTitle>
+
+        <PanelSubtitle>Create a lobby</PanelSubtitle>
+        <Row>
+          <Label>
+            Number of players
+            <Select value={createCount} onChange={(e) => setCreateCount(e.target.value)}>
+              {PLAYER_COUNTS.map((n) => (
+                <option key={n} value={n}>
+                  {n} players
+                </option>
+              ))}
+            </Select>
+          </Label>
+          <Button onClick={createLobby}>Create lobby &amp; get code</Button>
+        </Row>
+
+        <PanelSubtitle>Join a lobby</PanelSubtitle>
+        <form onSubmit={joinLobby}>
+          <Row>
+            <Label>
+              Lobby code
+              <Field
+                value={joinCode}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="6-digit code"
+                onChange={(e) => {
+                  setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setJoinError('');
+                }}
+              />
+            </Label>
+            <Label>
+              Number of players (ask the host)
+              <Select value={joinCount} onChange={(e) => setJoinCount(e.target.value)}>
+                {PLAYER_COUNTS.map((n) => (
+                  <option key={n} value={n}>
+                    {n} players
+                  </option>
+                ))}
+              </Select>
+            </Label>
+            {joinError && <div style={{ color: '#ffd9d9', fontSize: '11pt' }}>{joinError}</div>}
+            <Button type="submit" $variant="ghost">
+              Join lobby
+            </Button>
+          </Row>
+        </form>
+      </Panel>
+    </Screen>
   );
 };
 

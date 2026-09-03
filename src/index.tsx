@@ -4,11 +4,14 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { LanguageContextProvider } from './LanguageContextProvider';
+import { AudioSettingsProvider } from './audio';
 
 ReactDOM.render(
   <React.StrictMode>
     <LanguageContextProvider>
-      <App />
+      <AudioSettingsProvider>
+        <App />
+      </AudioSettingsProvider>
     </LanguageContextProvider>
   </React.StrictMode>,
   document.getElementById('root')

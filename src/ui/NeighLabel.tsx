@@ -7,7 +7,7 @@ import { NeighDiscussion } from '../game/neigh';
 import CardHover from './CardHover';
 import { motion, AnimatePresence } from 'framer-motion';
 import { _typeToColor } from './util';
-import useSound from 'use-sound';
+import useSound from '../audio';
 import { LanguageContext } from '../LanguageContextProvider';
 import { cardDescription } from '../BoardUtil';
 const MouseClickSound = require('../assets/sound/UI_MouseClick_01.ogg').default;

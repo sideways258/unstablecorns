@@ -6,7 +6,7 @@ import { _typeToColor } from './util';
 import CardHover from './CardHover';
 import { useContext, useState } from 'react';
 
-import useSound from 'use-sound';
+import useSound from '../audio';
 import { LanguageContext } from '../LanguageContextProvider';
 import { cardDescription } from '../BoardUtil';
 const HandOverSound = require('../assets/sound/collection_manager_card_mouse_over.ogg').default;

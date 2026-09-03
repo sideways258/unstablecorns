@@ -7,7 +7,7 @@ import useDynamicRefs from 'use-dynamic-refs';
 import React, { RefObject, useContext, useImperativeHandle, useState } from 'react';
 import CardHover from './CardHover';
 import { motion } from 'framer-motion';
-import useSound from 'use-sound';
+import useSound from '../audio';
 import { cardDescription } from '../BoardUtil';
 import { LanguageContext } from '../LanguageContextProvider';
 const HubMouseOverSound = require('../assets/sound/Hub_Mouseover.ogg').default;

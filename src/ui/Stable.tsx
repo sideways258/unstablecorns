@@ -8,7 +8,7 @@ import { useImperativeHandle } from 'react';
 import useDynamicRefs from 'use-dynamic-refs';
 import CardHover from './CardHover';
 import { motion } from 'framer-motion';
-import useSound from 'use-sound';
+import useSound from '../audio';
 import { LanguageContext } from '../LanguageContextProvider';
 import { cardDescription } from '../BoardUtil';
 const MouseClickSound = require('../assets/sound/board_common_dirt_poke_1.ogg').default;

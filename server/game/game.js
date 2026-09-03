@@ -24,8 +24,17 @@ var card_1 = require("./card");
 var constants_1 = require("./constants");
 var do_2 = require("./do");
 var underscore_1 = require("underscore");
+var core_1 = require("boardgame.io/core");
 var UnstableUnicorns = {
     name: "unstable_unicorns",
+    // Ends the whole match the moment the host asks for it (see the endMatch move).
+    endIf: function (G, ctx) {
+        if (G.endGame) {
+            return { endedByHost: true };
+        }
+    },
+    // Available in every phase/stage so the host can always bail out.
+    moves: { endMatch: endMatch },
     setup: function (ctx, setupData) {
         var players = Array.from({ length: ctx.numPlayers }, function (val, idx) {
             return {
@@ -138,14 +147,14 @@ var UnstableUnicorns = {
         },
         stages: {
             pregame: {
-                moves: { ready: ready, selectBaby: selectBaby, changeName: changeName }
+                moves: { ready: ready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch }
             },
             beginning: {
-                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard }
+                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch }
             },
             action_phase: {
                 moves: {
-                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard
+                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch
                 }
             }
         }
@@ -167,6 +176,13 @@ function initializeGame(G, ctx) {
 }
 function changeName(G, ctx, protagonist, name) {
     G.players[parseInt(protagonist)].name = name;
+}
+// Only the lobby host (seat 0) may end the match for everyone. endIf picks this up.
+function endMatch(G, ctx) {
+    if (ctx.playerID !== "0") {
+        return core_1.INVALID_MOVE;
+    }
+    G.endGame = true;
 }
 function ready(G, ctx, protagonist) {
     var _a;

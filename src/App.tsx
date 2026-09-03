@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import Client from './Client';
 import Landing from './Landing';
+import SeatPicker from './SeatPicker';
 
 const App = () => {
   return (
@@ -13,7 +14,10 @@ const App = () => {
           <Route path="/:matchID/:numPlayers/:playerID">
               <Client />
           </Route>
-          <Route path="/">
+          <Route exact path="/:matchID/:numPlayers">
+              <SeatPicker />
+          </Route>
+          <Route exact path="/">
               <Landing />
           </Route>
         </Switch>

@@ -11,11 +11,29 @@ type Props = {
     babyCards: Card[],
     playerID: PlayerID,
     moves: any,
+    matchID?: string,
 };
 
 const BoardGameBegin = (props: Props) => {
 
     const [playerName, setPlayerName] = useState<string>("Spieler");
+    const [copied, setCopied] = useState<boolean>(false);
+
+    const numPlayers = props.G.players.length;
+    const inviteLink = props.matchID
+        ? `${window.location.origin}/${props.matchID}/${numPlayers}`
+        : "";
+
+    const copyInvite = () => {
+        if (!inviteLink) return;
+        navigator.clipboard.writeText(inviteLink).then(
+            () => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            },
+            () => { /* clipboard blocked - link is shown on screen */ }
+        );
+    };
 
     return (
         <Wrapper>
@@ -34,6 +52,33 @@ const BoardGameBegin = (props: Props) => {
                     padding: "2em",
                     borderRadius: "16px"
                 }}>
+                    {props.matchID && (
+                        <div style={{ marginBottom: "1.5em" }}>
+                            <h1>Lobby code: {props.matchID}</h1>
+                            <div style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "1em",
+                                marginTop: "0.6em",
+                                flexWrap: "wrap"
+                            }}>
+                                <span style={{
+                                    fontFamily: "monospace",
+                                    fontSize: "12pt",
+                                    backgroundColor: "rgba(255,255,255,0.2)",
+                                    padding: "0.5em 0.8em",
+                                    borderRadius: "8px",
+                                    wordBreak: "break-all"
+                                }}>{inviteLink}</span>
+                                <button onClick={copyInvite}>
+                                    {copied ? "Copied!" : "Copy invite link"}
+                                </button>
+                            </div>
+                            <p style={{ fontSize: "10pt", opacity: 0.8, marginTop: "0.5em" }}>
+                                Share the code or link so friends can pick a seat. Seat 0 is the host.
+                            </p>
+                        </div>
+                    )}
                     <h1>My name:</h1>
                     <input type="text" name="name" value={playerName} onChange={(evt) => {
                         setPlayerName(evt.target.value)
