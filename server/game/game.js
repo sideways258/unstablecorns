@@ -28,10 +28,19 @@ var core_1 = require("boardgame.io/core");
 var funnyNames_1 = require("../funnyNames");
 var UnstableUnicorns = {
     name: "unstable_unicorns",
-    // Ends the whole match the moment the host asks for it (see the endMatch move).
+    // Win conditions: the host ends the match, OR a player reaches 7 unicorns
+    // in their stable.
     endIf: function (G, ctx) {
         if (G.endGame) {
             return { endedByHost: true };
+        }
+        if (ctx.phase === "main") {
+            for (var i = 0; i < G.players.length; i++) {
+                var p = G.players[i];
+                if (_countUnicorns(G, p.id) >= constants_1.CONSTANTS.stableSeats) {
+                    return { winner: p.id };
+                }
+            }
         }
     },
     // Available in every phase/stage so the host can always bail out.
@@ -178,6 +187,18 @@ function initializeGame(G, ctx) {
 }
 function changeName(G, ctx, protagonist, name) {
     G.players[parseInt(protagonist)].name = name;
+}
+var UNICORN_TYPES = ["baby", "basic", "unicorn", "narwhal"];
+// Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all
+// count; a "count_as_two" passive counts twice). 7 wins.
+function _countUnicorns(G, playerID) {
+    return (G.stable[playerID] || []).reduce(function (sum, cardID) {
+        var card = G.deck[cardID];
+        if (!card || UNICORN_TYPES.indexOf(card.type) === -1) {
+            return sum;
+        }
+        return sum + (card.passive && card.passive.indexOf("count_as_two") !== -1 ? 2 : 1);
+    }, 0);
 }
 // Only the lobby host (seat 0) may end the match for everyone. endIf picks this up.
 function endMatch(G, ctx) {

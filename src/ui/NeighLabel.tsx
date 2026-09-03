@@ -16,6 +16,8 @@ type Props = {
     card: Card;
     role: NeighLabelRole;
     originalInitiatorName: string;
+    /** Name of the player whose stable the card is going into (if not the initiator's own). */
+    targetName?: string;
     newInitiatorName?: string;
     numberOfNeighedCards: number;
     didVote: boolean;
@@ -36,9 +38,11 @@ const NeighLabel = (props: Props) => {
     });
     const context = useContext(LanguageContext)
 
+    const onText = props.targetName && props.targetName !== props.originalInitiatorName ? ` on ${props.targetName}` : "";
+
     let text = "";
     if (props.role === "original_initiator") {
-        text = "Other players may neigh your card. Wait for their decision..."
+        text = `You are playing ${props.card.title}${onText}. Other players may neigh it — wait for their decision...`;
     } else if (props.role === "did_neigh") {
         text = "You played a neigh card.";
     } else if (props.role === "did_not_neigh") {
@@ -47,7 +51,7 @@ const NeighLabel = (props: Props) => {
         if (props.newInitiatorName !== undefined) {
             text = `${props.newInitiatorName} played a neigh card. Do you want to neigh the neigh card of ${props.newInitiatorName}?`;
         } else {
-            text = `${props.originalInitiatorName} played ${props.card.title}. Do you want to neigh the card?`
+            text = `${props.originalInitiatorName} is playing ${props.card.title}${onText}. Do you want to neigh it?`;
         }
     } else if (props.role === "new_initiator") {
         text = `You played a neigh card. Others may neigh your neigh card. Wait for their decision...`;

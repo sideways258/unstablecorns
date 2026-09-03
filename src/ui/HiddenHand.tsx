@@ -30,16 +30,16 @@ const Wrapper = styled.div`
     justify-content: center;
     padding: 1em;
     font-family: 'Open Sans Condensed', sans-serif;
-    transform: translate(0%,-50%) scale(-0.6,-0.6);
+    transform: translate(0%, 6%) scale(-0.5, -0.5);
     pointer-events:none;
 `;
 
 const CardWrapper = styled.div<{transform: {x: number, y: number, rotate: string}, active: boolean}>`
     background-image: url(${BACK});
     background-size: cover;
-    border-radius: 16px;
-    width: 175px;
-    height: 250px;
+    border-radius: 14px;
+    width: 128px;
+    height: 182px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -59,16 +59,16 @@ function _transformForCard(idx: number, countCards: number): {x: number, y: numb
     let yStep = 0;
     if (countCards <= 6) {
         degStep = 5;
-        xStep = -35;
-        yStep = 7;
+        xStep = -30;
+        yStep = 5;
     } else if (countCards <= 8) {
         degStep = 6;
-        xStep = -80;
-        yStep = 5;
+        xStep = -60;
+        yStep = 3.5;
     } else {
         degStep = 4;
-        xStep = -90;
-        yStep = 3;
+        xStep = -66;
+        yStep = 2;
     }
 
     return { x: (idx - midIdx) * xStep, y: Math.abs(idx - midIdx) * Math.abs(idx - midIdx) * yStep, rotate: `${(idx - midIdx) * degStep}deg` };

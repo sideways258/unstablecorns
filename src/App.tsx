@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import Client from './Client';
 import Landing from './Landing';
-import SeatPicker from './SeatPicker';
 import JoinResolver from './JoinResolver';
 import { ThemeFX } from './ui/themed';
 
@@ -17,13 +16,13 @@ const App = () => {
           <Route exact path="/join/:code">
             <JoinResolver />
           </Route>
-          {/* /:gameId/:matchID/:numPlayers/:playerID */}
+          {/* /:gameId/:matchID/:numPlayers/:playerID - the running game */}
           <Route path="/:gameId/:matchID/:numPlayers/:playerID">
             <Client />
           </Route>
-          {/* /:gameId/:matchID/:numPlayers */}
+          {/* /:gameId/:matchID/:numPlayers - old invite links: auto-assign a seat */}
           <Route exact path="/:gameId/:matchID/:numPlayers">
-            <SeatPicker />
+            <JoinResolver />
           </Route>
           <Route exact path="/">
             <Landing />

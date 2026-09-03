@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { Screen, Panel, PanelTitle, Button, CodeDisplay } from './ui/themed';
@@ -6,17 +6,26 @@ import BackButton from './ui/BackButton';
 import { COLORS, GRADIENTS, isValidLobbyCode, normalizeLobbyCode } from './theme';
 import { GAMES } from './games/registry';
 
-type RouteParam = { code?: string };
-type State = 'looking' | 'notfound' | 'bad';
+type RouteParam = { code?: string; matchID?: string };
+type State = 'looking' | 'notfound' | 'full' | 'bad';
 
+// Resolves a lobby code: finds which game it belongs to, then hands you the
+// next free seat by order of joining. No seat picking.
 const JoinResolver = () => {
   const history = useHistory();
-  const { code: rawCode } = useParams<RouteParam>();
-  const code = normalizeLobbyCode(rawCode || '');
+  const params = useParams<RouteParam>();
+  const code = normalizeLobbyCode(params.code || params.matchID || '');
 
   const [state, setState] = useState<State>(isValidLobbyCode(code) ? 'looking' : 'bad');
+  const done = useRef(false);
 
   const lookup = useCallback(async () => {
+    if (done.current) return;
+    // tiny jitter so two people joining at the same instant are less likely to
+    // read the same stale "free seat"
+    await new Promise((r) => setTimeout(r, Math.random() * 600));
+    if (done.current) return;
+
     for (const g of GAMES) {
       const serverName = g.bgGame && g.bgGame.name;
       if (!serverName) continue;
@@ -26,16 +35,33 @@ const JoinResolver = () => {
         );
         if (!res.ok) continue;
         const data = await res.json();
-        const count = Array.isArray(data?.players) ? data.players.length : 0;
-        if (count >= g.minPlayers && count <= g.maxPlayers) {
-          history.replace(`/${g.id}/${code}/${count}`);
+        const players: any[] = Array.isArray(data?.players) ? data.players : [];
+        const count = players.length;
+        if (!(count >= g.minPlayers && count <= g.maxPlayers)) continue;
+
+        // lowest seat that nobody is currently connected to
+        let seat = -1;
+        for (let i = 0; i < count; i++) {
+          const p = players.find((x) => String(x.id) === String(i));
+          const taken = p ? p.isConnected === true : false;
+          if (!taken) {
+            seat = i;
+            break;
+          }
+        }
+
+        if (seat === -1) {
+          setState('full');
           return;
         }
+        done.current = true;
+        history.replace(`/${g.id}/${code}/${count}/${seat}`);
+        return;
       } catch (e) {
         /* try the next game */
       }
     }
-    setState('notfound');
+    setState((s) => (s === 'full' ? s : 'notfound'));
   }, [code, history]);
 
   useEffect(() => {
@@ -58,13 +84,23 @@ const JoinResolver = () => {
         )}
         {state === 'looking' && (
           <>
-            <PanelTitle>Finding your lobby</PanelTitle>
+            <PanelTitle>Joining lobby</PanelTitle>
             <CodeDisplay>{code}</CodeDisplay>
+            <p style={{ color: COLORS.textMuted, textAlign: 'center' }}>Grabbing you a seat&hellip;</p>
             <Dots>
               <i />
               <i />
               <i />
             </Dots>
+          </>
+        )}
+        {state === 'full' && (
+          <>
+            <PanelTitle>Lobby {code} is full</PanelTitle>
+            <p style={{ color: COLORS.textMuted }}>Every seat is taken. This page keeps checking for an opening.</p>
+            <Button $variant="ghost" onClick={lookup}>
+              Check again now
+            </Button>
           </>
         )}
         {state === 'notfound' && (

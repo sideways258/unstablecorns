@@ -83,10 +83,18 @@ export interface Instruction {
 
 const UnstableUnicorns = {
     name: "unstable_unicorns",
-    // Ends the whole match the moment the host asks for it (see the endMatch move).
+    // Win conditions: the host ends the match, OR a player reaches 7 unicorns
+    // in their stable.
     endIf: (G: UnstableUnicornsGame, ctx: Ctx) => {
         if (G.endGame) {
             return { endedByHost: true };
+        }
+        if (ctx.phase === "main") {
+            for (const p of G.players) {
+                if (_countUnicorns(G, p.id) >= CONSTANTS.stableSeats) {
+                    return { winner: p.id };
+                }
+            }
         }
     },
     // Available in every phase/stage so the host can always bail out.
@@ -242,6 +250,21 @@ function initializeGame(G: UnstableUnicornsGame, ctx: Ctx) {
 
 function changeName(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, name: string) {
     G.players[parseInt(protagonist)].name = name;
+}
+
+const UNICORN_TYPES = ["baby", "basic", "unicorn", "narwhal"];
+
+// Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all
+// count; a card with the "count_as_two" passive counts twice). Reaching
+// CONSTANTS.stableSeats (7) wins.
+export function _countUnicorns(G: UnstableUnicornsGame, playerID: PlayerID): number {
+    return (G.stable[playerID] || []).reduce((sum, cardID) => {
+        const card = G.deck[cardID];
+        if (!card || UNICORN_TYPES.indexOf(card.type) === -1) {
+            return sum;
+        }
+        return sum + (card.passive && card.passive.indexOf("count_as_two") !== -1 ? 2 : 1);
+    }, 0);
 }
 
 // Only the lobby host (seat 0) may end the match for everyone. endIf picks this up.

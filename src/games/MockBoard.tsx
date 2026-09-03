@@ -5,6 +5,7 @@ import { MOCK_KIND_COLORS } from './mockCards';
 import type { MockGameState } from './mockGame';
 import GameEnded from '../ui/GameEnded';
 import LobbyView from '../ui/LobbyView';
+import TurnIndicator from '../ui/TurnIndicator';
 import { buildRoster } from '../ui/lobbyRoster';
 
 type Props = {
@@ -60,9 +61,7 @@ const MockBoard = (props: Props) => {
         matchID={matchID}
         gameId={gameId}
         numPlayers={ctx.numPlayers}
-        backTo={
-          playerID === '0' || !(gameId && matchID) ? '/' : `/${gameId}/${matchID}/${ctx.numPlayers}`
-        }
+        backTo="/"
         players={roster}
         readyCount={readyCount}
         nameValue={lobbyName}
@@ -90,8 +89,7 @@ const MockBoard = (props: Props) => {
   const myHand = playerID != null ? G.hands[playerID] || [] : [];
   const seats = Object.keys(G.hands);
 
-  const inviteLink =
-    gameId && matchID ? `${window.location.origin}/${gameId}/${matchID}/${seats.length}` : '';
+  const inviteLink = matchID ? `${window.location.origin}/join/${matchID}` : '';
 
   const copyInvite = () => {
     if (!inviteLink) return;
@@ -106,6 +104,10 @@ const MockBoard = (props: Props) => {
 
   return (
     <Screen>
+      <TurnIndicator
+        isYou={playerID != null && ctx.currentPlayer === playerID}
+        currentName={G.names[ctx.currentPlayer] || `Player ${ctx.currentPlayer}`}
+      />
       <TopBar>
         {matchID && (
           <Chip>

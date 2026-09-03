@@ -30,10 +30,8 @@ type Props = {
 };
 
 const LobbyView = (props: Props) => {
-  const inviteLink =
-    props.gameId && props.matchID
-      ? `${window.location.origin}/${props.gameId}/${props.matchID}/${props.numPlayers}`
-      : '';
+  // Friends open this and get auto-assigned the next free seat.
+  const inviteLink = props.matchID ? `${window.location.origin}/join/${props.matchID}` : '';
 
   const copyInvite = () => {
     if (!inviteLink) return;

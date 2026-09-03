@@ -139,11 +139,11 @@ const StableWrapper = styled.div`
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     background-color: #6D5031;
-    padding: 0.5em;
-    border-radius: 16px;
-    min-height: 84px;
+    padding: 6px;
+    border-radius: 14px;
+    min-height: 66px;
 `;
 
 const UpgradeDowngradeSection = styled.div`
@@ -153,8 +153,8 @@ const UpgradeDowngradeSection = styled.div`
     background: rgba(0, 0, 0, 0.3);
     border: 1px dashed rgba(255, 255, 255, 0.35);
     border-radius: 12px;
-    padding: 5px 12px;
-    min-height: 46px;
+    padding: 4px 12px;
+    min-height: 38px;
 `;
 
 const SectionTag = styled.div`
@@ -182,12 +182,12 @@ const EmptyNote = styled.span`
 `;
 
 const StableItem = styled.div`
-    padding: 0 0.5em;
+    padding: 0 3px;
     cursor: pointer;
     position: relative;
     transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1);
     &:hover {
-        transform: translateY(-10px) scale(1.14);
+        transform: translateY(-10px) scale(1.2);
         z-index: 20;
     }
 `;
@@ -202,10 +202,10 @@ const glow = keyframes`
 `;
 
 const CardImage = styled(motion.img)<{color: string, isGlowing: boolean, isTranslucent: boolean}>`
-    width: 64px;
-    height: 64px;
-    border-radius: 12px;
-    border: 4px solid ${props => props.color};
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    border: 3px solid ${props => props.color};
     animation: ${props => props.isGlowing ? css`${glow} 1s infinite alternate` : 'null'};
     opacity: ${props => !props.isTranslucent ? 1 : 0.5};
     transition: all 0.3s cubic-bezier(.25,.8,.25,1);
@@ -225,12 +225,12 @@ const MiniCardImage = styled(motion.img)<{color: string, isGlowing: boolean, isT
 
 const Placeholder = styled.div`
     background-color: rgba(0,0,0,0.18);
-    flex: 1 0 150px;
-    min-width: 150px;
-    min-height: 64px;
-    margin-left: 0.5em;
-    padding: 0.4em;
-    border-radius: 12px;
+    flex: 1 0 130px;
+    min-width: 130px;
+    min-height: 50px;
+    margin-left: 0.4em;
+    padding: 0.35em;
+    border-radius: 10px;
     border: 2px dashed rgba(255, 255, 255, 0.35);
     display: flex;
     justify-content: center;
@@ -239,7 +239,7 @@ const Placeholder = styled.div`
     font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
     font-weight: 500;
     color: rgba(255, 255, 255, 0.7);
-    font-size: 1.15em;
+    font-size: 0.95em;
     cursor: pointer;
     user-select: none;
     transition: background-color 0.15s ease, border-color 0.15s ease;

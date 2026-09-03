@@ -7,7 +7,8 @@ import PlayerField, { PlayerFieldHandle } from './ui/PlayerField';
 import useSound from './audio';
 import { motion, AnimateSharedLayout, AnimatePresence } from "framer-motion";
 // game
-import { UnstableUnicornsGame, Ctx, _findOpenScenesWithProtagonist, Instruction, Scene, canDraw, canPlayCard, _findInProgressScenesWithProtagonist, _findInstruction } from './game/game';
+import { UnstableUnicornsGame, Ctx, _findOpenScenesWithProtagonist, Instruction, Scene, canDraw, canPlayCard, _findInProgressScenesWithProtagonist, _findInstruction, _countUnicorns } from './game/game';
+import { CONSTANTS } from './game/constants';
 // assets
 import UpgradeDowngradeStable from './ui/UpgradeDowngradeStable';
 import DrawPile from './ui/DrawPile';
@@ -31,6 +32,10 @@ import React from 'react';
 import { LanguageContext } from './LanguageContextProvider';
 import GameEnded from './ui/GameEnded';
 import BoardShell from './ui/BoardShell';
+import TurnIndicator from './ui/TurnIndicator';
+import CancelActionButton from './ui/CancelActionButton';
+import UpgradeDowngradeTarget from './ui/UpgradeDowngradeTarget';
+import StableInspector from './ui/StableInspector';
 
 const YourTurnSound = require('./assets/sound/ALERT_YourTurn_0v2.ogg').default;
 const DrawCardSound = require('./assets/sound/draw_card_and_add_to_hand_1.ogg').default;
@@ -177,6 +182,7 @@ const Board = (props: any) => {
 
     const [showDeckFinder, setShowDeckFinder] = useState<SearchTarget[] | undefined>(undefined);
     const [showPlayerHand, setShowPlayerHand] = useState<PlayerID | undefined>(undefined);
+    const [showStableOf, setShowStableOf] = useState<PlayerID | undefined>(undefined);
     const [showBlatantThievery, setShowBlatantThievery] = useState<PlayerID | undefined>(undefined);
     const [showDiscardFinder, setShowDiscardFinder] = useState<{ cardID: CardID }[] | undefined>(undefined);
     const [showNurseryFinder, setSHowNurseryFinder] = useState(false);
@@ -284,7 +290,31 @@ const Board = (props: any) => {
         }
     }, [G.uiCardToCard?.id]);
 
+    // Actions the player has started (aiming an arrow, or a card effect waiting
+    // for a target) that they can back out of.
+    const cancellableStates = boardStates.filter(
+        (b: BoardState) => (b as any).info?.instructionID && !String(b.type).includes("committed") && b.type !== "neigh__wait"
+    );
+    const canCancelAction = cardInteraction !== undefined || cancellableStates.length > 0;
+    const handleCancelAction = () => {
+        setCardInteraction(undefined);
+        setC2CArrow(undefined);
+        setHoverTargets(undefined);
+        cancellableStates.forEach((b: BoardState) => moves.skipExecuteDo(playerID, (b as any).info.instructionID));
+    };
+
     if (ctx.gameover) {
+        const winner: string | undefined = ctx.gameover.winner;
+        if (winner !== undefined) {
+            const wonName = (G.players[parseInt(winner, 10)] && G.players[parseInt(winner, 10)].name) || `Player ${winner}`;
+            return (
+                <GameEnded
+                    icon="🏆"
+                    title={winner === playerID ? 'You win! 🦄' : `${wonName} wins!`}
+                    message={`${wonName} filled their stable with ${CONSTANTS.stableSeats} unicorns.`}
+                />
+            );
+        }
         return <GameEnded />;
     }
 
@@ -304,6 +334,32 @@ const Board = (props: any) => {
 
     return (
         <AnimateSharedLayout>
+          <TurnIndicator
+            isYou={ctx.currentPlayer === playerID}
+            currentName={(G.players[parseInt(ctx.currentPlayer, 10)] && G.players[parseInt(ctx.currentPlayer, 10)].name) || `Player ${ctx.currentPlayer}`}
+          />
+          {canCancelAction && <CancelActionButton onCancel={handleCancelAction} />}
+          {cardInteraction?.key === "play_upgradeDowngradeCardFromHand__choose_target" && (
+            <UpgradeDowngradeTarget
+              card={G.deck[cardInteraction.info.cardID]}
+              self={{ id: playerID, name: (G.players[parseInt(playerID, 10)] && G.players[parseInt(playerID, 10)].name) || `You` }}
+              others={G.players.filter(p => p.id !== playerID).map(p => ({ id: p.id, name: p.name }))}
+              onPick={(targetID) => {
+                moves.playUpgradeDowngradeCard(playerID, targetID, cardInteraction.info.cardID);
+                setCardInteraction(undefined);
+              }}
+              onCancel={() => setCardInteraction(undefined)}
+            />
+          )}
+          {showStableOf !== undefined && G.players[parseInt(showStableOf, 10)] && (
+            <StableInspector
+              name={G.players[parseInt(showStableOf, 10)].name}
+              unicornCount={_countUnicorns(G, showStableOf)}
+              stable={[...G.stable[showStableOf], ...G.temporaryStable[showStableOf]].map(c => G.deck[c])}
+              upgradeDowngrade={G.upgradeDowngradeStable[showStableOf].map(c => G.deck[c])}
+              onClose={() => setShowStableOf(undefined)}
+            />
+          )}
           <BoardShell>
             <Wrapper layout onMouseMove={wrapperOnMouseMove}>
                 <div style={{ position: "absolute", right: 0, color: "rgba(0,0,0,0)", height: "20px", width: "20px" }} onClick={() => {
@@ -433,6 +489,16 @@ const Board = (props: any) => {
                                     setCardInteraction(undefined);
                                     moves.setUICardToCard(undefined)
                                 }
+                            } else if (cardInteraction === undefined) {
+                                // idle -> peek at the owner's stable
+                                const owner = G.players.find(p =>
+                                    G.stable[p.id].indexOf(cardID) !== -1 ||
+                                    G.temporaryStable[p.id].indexOf(cardID) !== -1 ||
+                                    G.upgradeDowngradeStable[p.id].indexOf(cardID) !== -1
+                                );
+                                if (owner && owner.id !== playerID) {
+                                    setShowStableOf(owner.id);
+                                }
                             }
                         }}
                         onStableCardMouseEnter={cardID => {
@@ -470,6 +536,9 @@ const Board = (props: any) => {
                             } else if (cardInteraction?.key === "play_upgradeDowngradeCardFromHand__choose_target") {
                                 moves.playUpgradeDowngradeCard(playerID, plid, cardInteraction.info.cardID);
                                 setCardInteraction(undefined);
+                            } else {
+                                // no interaction in progress -> just peek at their stable
+                                setShowStableOf(plid);
                             }
                         }}
                     />
@@ -774,6 +843,8 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
     let role: NeighLabelRole = "original_initiator";
     let newInitiatorName: string | undefined = undefined;
     const originalInitiatorName = G.players[parseInt(G.neighDiscussion.protagonist)].name;
+    const targetPlayer = G.players[parseInt(String(G.neighDiscussion.target), 10)];
+    const targetName = targetPlayer ? targetPlayer.name : undefined;
 
     if (G.neighDiscussion.rounds.length > 1) {
         const beforeRound = _.last(G.neighDiscussion.rounds, 2)[0];
@@ -826,7 +897,7 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
 
     return (
         <NeighLabelWrapper>
-            <NeighLabel card={G.deck[G.neighDiscussion.cardID]} originalInitiatorName={originalInitiatorName} newInitiatorName={newInitiatorName} role={role} didVote={didVote} numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length} showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined} onPlayNeighClick={onPlayNeighClick} onDontPlayNeighClick={onDontPlayNeighClick} />
+            <NeighLabel card={G.deck[G.neighDiscussion.cardID]} originalInitiatorName={originalInitiatorName} targetName={targetName} newInitiatorName={newInitiatorName} role={role} didVote={didVote} numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length} showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined} onPlayNeighClick={onPlayNeighClick} onDontPlayNeighClick={onDontPlayNeighClick} />
         </NeighLabelWrapper>
     );
 }
@@ -1075,7 +1146,7 @@ const Wrapper = styled(motion.div)`
 
 const Top = styled.div`
     position: absolute;
-    top: 40px;
+    top: 22px;
     z-index: 2;
     height: 50px;
 `;
@@ -1119,7 +1190,7 @@ const DrawPileWrapper = styled.div<{ zIndexFocus: boolean }>`
 
 const Bottom = styled.div`
     position: absolute;
-    bottom: -40px;
+    bottom: 8px;
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -1131,7 +1202,7 @@ const Bottom = styled.div`
    below it and pushing everything into the centre of the table */
 const HandDock = styled.div`
     position: relative;
-    margin-top: -64px;
+    margin-top: -44px;
     z-index: 6;
 `;
 

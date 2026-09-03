@@ -60,21 +60,21 @@ const Hand = (props: Props) => {
                 }
 
                 return (
-                    <CardWrapper key={card.id} borderColor={_typeToColor(card.type)} isGlowing={props.glowingCards.includes(card.id)} transform={_transformForCard(idx, props.cards.length)} onClick={(evt) => props.onClick(evt, card.id)} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} bringToForeground={hoverCardID === card.id}>
-                        <Top>
-                            <Type fontColor={_typeToColor(card.type)}>
-                                <img src={ImageLoader.icon(card.type)} width={"20px"}/>
-                                {_typeToString(card.type)}
-                            </Type>
-                            <Title>
-                                {card.title}
-                            </Title>
-                        </Top>
-                        <CardImage image={ImageLoader.load(card.image)} />
+                    <CardWrapper key={card.id} transform={_transformForCard(idx, props.cards.length)} onClick={(evt) => props.onClick(evt, card.id)} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} bringToForeground={hoverCardID === card.id}>
+                        <Face borderColor={_typeToColor(card.type)} isGlowing={props.glowingCards.includes(card.id)}>
+                            <Top>
+                                <Type fontColor={_typeToColor(card.type)}>
+                                    <img src={ImageLoader.icon(card.type)} width={"20px"}/>
+                                    {_typeToString(card.type)}
+                                </Type>
+                                <Title>
+                                    {card.title}
+                                </Title>
+                            </Top>
+                            <CardImage image={ImageLoader.load(card.image)} />
+                        </Face>
                         {hoverCardID === card.id &&
-                            <>
-                                <CardHover title={card.title} scale={0.75} position="top" offset={{ x: idx < 3 ? 210 : -220, y: -40 }} text={cardDescription(card, context!.language)} color={_typeToColor(card.type)} text2={typeText} />
-                            </>
+                            <CardHover title={card.title} scale={0.75} position="top" offset={{ x: idx < 3 ? 210 : -220, y: -40 }} text={cardDescription(card, context!.language)} color={_typeToColor(card.type)} text2={typeText} />
                         }
                     </CardWrapper>
                 );
@@ -91,50 +91,68 @@ const Wrapper = styled.div`
     font-family: 'Open Sans Condensed', sans-serif;
 `;
 
-const CardWrapper = styled.div<{ bringToForeground: boolean, borderColor: string, transform: { x: number, y: number, rotate: string }, isGlowing: boolean }>`
-    border-radius: 18px;
-    width: 175px;
-    height: 250px;
+/* The slot keeps a fixed hit-box and only carries the fan position, so hovering
+   never moves the element out from under the cursor (no flicker). The visual
+   enlarge lives on <Face>. */
+const CardWrapper = styled.div<{ bringToForeground: boolean, transform: { x: number, y: number, rotate: string } }>`
+    --rot: ${props => props.transform.rotate};
+    position: relative;
+    width: 128px;
+    height: 182px;
+    cursor: pointer;
+    transform: translate(${props => props.transform.x}px, ${props => props.transform.y}px) rotate(var(--rot));
+    z-index: ${props => props.bringToForeground ? 40 : 0};
+    &:hover {
+        z-index: 50;
+    }
+`;
+
+const Face = styled.div<{ borderColor: string, isGlowing: boolean }>`
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
     align-items: center;
     background-color: white;
-    border: 8px solid ${props => props.borderColor};
-    transform: translate(${props => props.transform.x}px, ${props => props.transform.y}px) rotate(${props => props.transform.rotate});
+    border: 6px solid ${props => props.borderColor};
     box-shadow: 0 6px 14px rgba(0,0,0,0.28), 0 2px 4px rgba(0,0,0,0.22);
-    transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+    transform-origin: bottom center;
+    transition: transform 0.18s cubic-bezier(.2,.9,.3,1), box-shadow 0.18s ease, filter 0.18s ease;
     animation: ${props => props.isGlowing ? css`${glow} 1s infinite alternate` : 'null'};
-    :hover {
-        transform: translate(${props => props.transform.x}px, -90%) scale(1.5);
+
+    ${CardWrapper}:hover & {
+        transform: rotate(calc(-1 * var(--rot, 0deg))) translateY(-58%) scale(1.6);
         box-shadow: 0 30px 55px rgba(0,0,0,0.45);
         filter: drop-shadow(0 0 16px rgba(255, 209, 102, 0.55));
-        z-index: 50;
     }
-    cursor: pointer;
-    z-index: ${props => props.bringToForeground ? 4 : 0 };
 `;
 
 const Top = styled.div`
     display: flex;
     flex-direction: column;
     width: 100%;
-    margin: 0.5em;
-    margin-left: 1em;
+    padding: 6px 8px 2px;
+    box-sizing: border-box;
 `;
 
 const Type = styled.div<{ fontColor: string }>`
     display: flex;
-    align-content: center;
+    align-items: center;
+    gap: 3px;
     font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
     font-weight: 600;
-    font-size: 0.9em;
+    font-size: 10px;
     color: ${props => props.fontColor};
+    img { width: 14px; height: 14px; }
 `;
 
 const Title = styled.div`
     font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
     font-weight: 600;
-    font-size: 1.15em;
+    font-size: 12px;
+    line-height: 1.1;
 `;
 
 const CardImage = styled.div<{ image: string }>`
@@ -201,16 +219,16 @@ function _transformForCard(idx: number, countCards: number): { x: number, y: num
     let yStep = 0;
     if (countCards <= 6) {
         degStep = 5;
-        xStep = -35;
-        yStep = 7;
+        xStep = -26;
+        yStep = 5;
     } else if (countCards <= 8) {
         degStep = 5.5;
-        xStep = -90;
-        yStep = 3;
+        xStep = -66;
+        yStep = 2.2;
     } else {
         degStep = 4;
-        xStep = -100;
-        yStep = 1;
+        xStep = -74;
+        yStep = 0.8;
     }
 
     return { x: (idx - midIdx) * xStep, y: Math.abs(idx - midIdx) * Math.abs(idx - midIdx) * yStep, rotate: `${(idx - midIdx) * degStep}deg` };

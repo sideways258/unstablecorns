@@ -52,7 +52,7 @@ const BoardGameBegin = (props: Props) => {
             matchID={props.matchID}
             gameId={props.gameId}
             numPlayers={numPlayers}
-            backTo={props.playerID === '0' || !(props.gameId && props.matchID) ? '/' : `/${props.gameId}/${props.matchID}/${numPlayers}`}
+            backTo="/"
             players={roster}
             readyCount={readyCount}
             nameValue={playerName}

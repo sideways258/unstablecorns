@@ -133,12 +133,12 @@ const currentGlow = keyframes`
 `;
 
 const PlayerBox = styled.div<{ current: boolean }>`
-    width: 180px;
-    height: 220px;
+    width: 148px;
+    height: 176px;
     background-color: ${props => props.current ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0)"};
-    border-radius: 16px;
-    margin: 0.6em;
-    padding: 0.5em;
+    border-radius: 14px;
+    margin: 0.35em;
+    padding: 5px;
     animation: ${props => props.current ? css`${currentGlow} 2s ease-in-out infinite` : 'none'};
 `;
 
@@ -160,8 +160,9 @@ const Title = styled.div`
     color: white;
     font-family: 'Fredoka', 'Open Sans', sans-serif;
     font-weight: 600;
-    padding: 0.5em 0.5em 0 0.5em;
-    font-size: 1.2em;
+    padding: 5px 6px 0;
+    font-size: 11px;
+    line-height: 1.15;
     display: flex;
     position: relative;
 `;
@@ -177,9 +178,9 @@ const UpgradeDowngradeStable = styled.div`
 const UpgradeDowngradeImage = styled.img<{ image: string, isTranslucent: boolean }>`
     background-image: url(${props => props.image});
     background-size: cover;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     margin: 0 0.1em;
     opacity: ${props => !props.isTranslucent ? 1 : 0.5};
     transition: all 0.3s cubic-bezier(.25,.8,.25,1);
@@ -197,10 +198,10 @@ const Stable = styled.div`
 const UnicornImage = styled(motion.div)<{ image: string, isTranslucent: boolean }>`
     background-image: url(${props => props.image});
     background-size: cover;
-    min-width: 50px;
-    height: 60px;
-    border-radius: 8px;
-    margin: 0.2em;
+    min-width: 40px;
+    height: 46px;
+    border-radius: 6px;
+    margin: 0.1em;
     opacity: ${props => !props.isTranslucent ? 1 : 0.5};
     transition: all 0.3s cubic-bezier(.25,.8,.25,1);
     cursor: pointer;
