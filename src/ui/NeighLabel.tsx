@@ -1,11 +1,10 @@
-import React, { useContext, useState } from 'react';
+import { useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 import ImageLoader from '../assets/card/imageLoader';
 import { Card, CardID } from '../game/card';
-import { UnstableUnicornsGame } from '../game/game';
-import { NeighDiscussion } from '../game/neigh';
 import CardHover from './CardHover';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { _typeToColor } from './util';
 import useSound from '../audio';
 import { LanguageContext } from '../LanguageContextProvider';
@@ -56,98 +55,158 @@ const NeighLabel = (props: Props) => {
         text = `${props.newInitiatorName} played a neigh card. Do you want to neigh his neigh card?`;
     }
 
-    return (
-        <Wrapper exit={{ opacity: 0, y: 200 }} initial={{ opacity: 0, y: 200 }}
-      animate={{ opacity: 1, y: 0 }} transition={{duration: 1}}>
-            <div onMouseEnter={() => {
-                setShowHover(props.card.id);
-                playHoverSound();
-            }}
-                onMouseLeave={() => {
-                    setShowHover(undefined);
-                }}>
-                <CardImage src={ImageLoader.load(props.card.image)} />
-                {showHover === props.card.id &&
-                    <CardHover title={props.card.title} position={"bottom"} offset={{ x: 80, y: -30 }} color={_typeToColor(props.card.type)} text={cardDescription(props.card, context!.language)} />
-                }
-            </div>
+    return createPortal(
+        <Backdrop>
+            <Wrapper
+                initial={{ opacity: 0, scale: 0.88 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.88 }}
+                transition={{ duration: 0.22 }}
+            >
+                <CardWrap
+                    onMouseEnter={() => {
+                        setShowHover(props.card.id);
+                        playHoverSound();
+                    }}
+                    onMouseLeave={() => setShowHover(undefined)}
+                >
+                    <CardImage src={ImageLoader.load(props.card.image)} />
+                    {showHover === props.card.id && (
+                        <CardHover
+                            title={props.card.title}
+                            position={'bottom'}
+                            offset={{ x: 60, y: -20 }}
+                            color={_typeToColor(props.card.type)}
+                            text={cardDescription(props.card, context!.language)}
+                        />
+                    )}
+                </CardWrap>
 
-            <div style={{ display: "flex", flexDirection: "column" }}>
-                <div>
-                    {text}
-                </div>
-                {props.numberOfNeighedCards % 2 === 1 &&
-                    <div>
-                        Neigh result: {props.originalInitiatorName} <span style={{ color: "red" }}>is stopped from playing </span> {props.card.title}.
-                    </div>
-                }
-                {props.numberOfNeighedCards % 2 === 0 &&
-                    <div>
-                        Neigh result: {props.originalInitiatorName} <span style={{ color: "green" }}>can play </span> {props.card.title}.
-                    </div>
-                }
+                <Text>
+                    <div>{text}</div>
+                    {props.numberOfNeighedCards % 2 === 1 && (
+                        <div>
+                            Result: {props.originalInitiatorName} <span style={{ color: '#ff8a8a' }}>is stopped from playing</span>{' '}
+                            {props.card.title}.
+                        </div>
+                    )}
+                    {props.numberOfNeighedCards % 2 === 0 && (
+                        <div>
+                            Result: {props.originalInitiatorName} <span style={{ color: '#8affb0' }}>can play</span> {props.card.title}.
+                        </div>
+                    )}
+                </Text>
 
-            </div>
-            {props.didVote === false &&
-                <div style={{ marginLeft: "1em" }}>
-                    <DontNeighButton onClick={() => {props.onDontPlayNeighClick(); playMouseClick();}}>Don't neigh</DontNeighButton>
-                </div>
-            }
-            {props.showPlayNeighButton && props.didVote === false &&
-                <div style={{ marginLeft: "1em" }}>
-                    <NeighButton onClick={() => {props.onPlayNeighClick(); playMouseClick()}}>Play Neigh</NeighButton>
-                </div>
-            }
-        </Wrapper>
+                {props.didVote === false && (
+                    <Buttons>
+                        <DontNeighButton
+                            onClick={() => {
+                                props.onDontPlayNeighClick();
+                                playMouseClick();
+                            }}
+                        >
+                            Don&rsquo;t neigh
+                        </DontNeighButton>
+                        {props.showPlayNeighButton && (
+                            <NeighButton
+                                onClick={() => {
+                                    props.onPlayNeighClick();
+                                    playMouseClick();
+                                }}
+                            >
+                                Play Neigh
+                            </NeighButton>
+                        )}
+                    </Buttons>
+                )}
+            </Wrapper>
+        </Backdrop>,
+        document.body
     );
 }
 
+const Backdrop = styled.div`
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.28);
+    /* let clicks reach the board around the popup; the panel re-enables itself */
+    pointer-events: none;
+    & > * {
+        pointer-events: auto;
+    }
+`;
+
+const Text = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 240px;
+    min-width: 200px;
+`;
+
+const Buttons = styled.div`
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    flex: none;
+`;
+
 const Wrapper = styled(motion.div)`
-    background: linear-gradient(180deg, rgba(30, 14, 26, 0.85), rgba(20, 10, 18, 0.92));
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 2px solid rgba(255, 255, 255, 0.16);
-    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
+    background: linear-gradient(180deg, rgba(38, 18, 32, 0.94), rgba(22, 11, 20, 0.97));
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+    font-size: clamp(12px, 2.6vw, 16px);
     color: white;
-    padding: 1em 1.4em;
-    border-radius: 18px;
-    margin-top: 1em;
+    padding: 20px 22px;
+    border-radius: 22px;
+    width: min(920px, 94vw);
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.45);
+    gap: 16px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
 `;
 
 const glow = keyframes`
-    from {
-        box-shadow: 0 0px 40px #f0f, 0 0px 10px red, 0 0px 20px #0ff;
-    }
-    to {
-        box-shadow: 0 0px 40px #0ff, 0 0px 10px #f0f, 0 0px 20px #f0f;
-    }
+    from { box-shadow: 0 0 34px #f0f, 0 0 10px red, 0 0 18px #0ff; }
+    to   { box-shadow: 0 0 34px #0ff, 0 0 10px #f0f, 0 0 18px #f0f; }
 `;
 
-const CardImage = styled(motion.img)`
-    width: 64px;
-    height: 64px;
-    border-radius: 12px;
-    margin-right: 1em;
+const CardWrap = styled.div`
+    position: relative;
+    flex: none;
+`;
+
+const CardImage = styled.img`
+    width: 84px;
+    height: 84px;
+    border-radius: 14px;
+    display: block;
     animation: ${glow} 1s infinite alternate;
 `;
 
 const chunky = `
-    padding: 0.6em 1.1em;
-    border-radius: 12px;
+    padding: 0.85em 1.5em;
+    min-height: 48px;
+    border-radius: 14px;
     cursor: pointer;
-    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
-    font-weight: 600;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+    font-weight: 700;
+    font-size: clamp(13px, 3vw, 16px);
     color: #fff;
-    border: 2px solid rgba(255, 255, 255, 0.85);
+    border: 3px solid #fff;
     user-select: none;
     transition: transform 0.08s ease, filter 0.15s ease;
     &:hover { filter: brightness(1.1); }
-    &:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.35) !important; }
+    &:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.4) !important; }
 `;
 
 const DontNeighButton = styled.div`

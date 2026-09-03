@@ -496,12 +496,7 @@ const Board = (props: any) => {
                             }
                         }} isGlowing={boardStates.find(s => s.type === "drawCard" || s.type === "draw__clickOnDrawPile") !== undefined} count={G.drawPile.length} />
                     </DrawPileWrapper>
-                    <AnimatePresence>
-
-                        {
-                            renderNeighLabel(G, ctx, moves, playerID)
-                        }
-                    </AnimatePresence>
+                    {renderNeighLabel(G, ctx, moves, playerID)}
 
                     {renderInfoLabel(G, ctx, playerID, boardStates)}
                     <MiddleLeftWrapper zIndexFocus={isHoveringOverHandCard}>
@@ -1122,9 +1117,8 @@ const DrawPileWrapper = styled.div<{ zIndexFocus: boolean }>`
 
 const Bottom = styled.div`
     position: absolute;
-    bottom: 120px;
+    bottom: 150px;
     width: 100%;
-    height: 120px;
     display: flex;
     flex-direction: column;
     align-items: center;

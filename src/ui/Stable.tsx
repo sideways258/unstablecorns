@@ -48,7 +48,12 @@ const Stable = React.forwardRef<StableHandle, Props>((props, ref) => {
 
     return (
         <Wrapper>
-            <UpgradeDowngradeStableWrapper>
+            <UpgradeDowngradeSection>
+                <SectionTag>Upgrades / Downgrades</SectionTag>
+                <UpgradeDowngradeRow>
+                {props.upgradeDowngradeCards.length === 0 &&
+                    <EmptyNote>played here</EmptyNote>
+                }
                 {props.upgradeDowngradeCards.map(card => {
                     return (
                         <StableItem 
@@ -79,7 +84,8 @@ const Stable = React.forwardRef<StableHandle, Props>((props, ref) => {
                         </StableItem>
                     );
                 })}
-            </UpgradeDowngradeStableWrapper>
+                </UpgradeDowngradeRow>
+            </UpgradeDowngradeSection>
             <StableWrapper>
                 {props.cards.map((card, idx) => {
                     return (
@@ -120,23 +126,59 @@ const Stable = React.forwardRef<StableHandle, Props>((props, ref) => {
 });
 
 const Wrapper = styled.div`
-    width: 700px;
+    width: 820px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 `;
 
 const StableWrapper = styled.div`
     width: 100%;
+    box-sizing: border-box;
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
+    align-items: center;
+    gap: 4px;
     background-color: #6D5031;
     padding: 0.5em;
     border-radius: 16px;
-    min-height: 78px;
+    min-height: 84px;
 `;
 
-const UpgradeDowngradeStableWrapper = styled.div`
-    min-height: 32px;
+const UpgradeDowngradeSection = styled.div`
     display: flex;
-    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px dashed rgba(255, 255, 255, 0.35);
+    border-radius: 12px;
+    padding: 5px 12px;
+    min-height: 46px;
+`;
+
+const SectionTag = styled.div`
+    flex: none;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.75);
+`;
+
+const UpgradeDowngradeRow = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+`;
+
+const EmptyNote = styled.span`
+    font-size: 0.8em;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.4);
 `;
 
 const StableItem = styled.div`
@@ -183,17 +225,21 @@ const MiniCardImage = styled(motion.img)<{color: string, isGlowing: boolean, isT
 
 const Placeholder = styled.div`
     background-color: rgba(0,0,0,0.18);
-    width: 100%;
-    margin-left: 1em;
+    flex: 1 0 150px;
+    min-width: 150px;
+    min-height: 64px;
+    margin-left: 0.5em;
+    padding: 0.4em;
     border-radius: 12px;
     border: 2px dashed rgba(255, 255, 255, 0.35);
     display: flex;
     justify-content: center;
     align-items: center;
+    text-align: center;
     font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
     font-weight: 500;
     color: rgba(255, 255, 255, 0.7);
-    font-size: 1.3em;
+    font-size: 1.15em;
     cursor: pointer;
     user-select: none;
     transition: background-color 0.15s ease, border-color 0.15s ease;

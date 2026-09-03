@@ -1,4 +1,5 @@
-import React, { useContext, useState } from 'react';
+import { useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import ImageLoader from '../assets/card/imageLoader';
 import BG from '../assets/ui/board-background.jpg';
@@ -21,80 +22,125 @@ const Finder = (props: Props) => {
     const [showHover, setShowHover] = useState<CardID | undefined>(undefined);
     const context = useContext(LanguageContext)
 
-    return (
+    // Portalled to <body> so it's a real full-screen overlay (the board itself is
+    // rendered inside a scaled container).
+    return createPortal(
         <Wrapper>
-            {(props.showBackButton === undefined || props.showBackButton === true) &&
-                <Button onClick={() => props.onBackClick()}>
-                    Go back
-                </Button>
-            }
+            <Header>
+                {(props.showBackButton === undefined || props.showBackButton === true) &&
+                    <BackBtn onClick={() => props.onBackClick()}>← Go back</BackBtn>
+                }
+                {props.title && <TitleTag>{props.title}</TitleTag>}
+            </Header>
 
-            {props.title && <p style={{padding: "1em", backgroundColor: "#F8B500", borderRadius: "12px", color: "white"}}>{props.title}</p>}
-            
             <List>
                 {props.cards.map((card, idx) => {
                     return (
                         <Item key={card.id} onMouseEnter={() => setShowHover(card.id)} onMouseLeave={() => setShowHover(undefined)}>
                             <div onClick={() => props.onCardClick(card.id)}>
-                                <CardImage image={props.hide ? ImageLoader.load("back") : ImageLoader.load(card.image)} color={props.hide ? "black"  : _typeToColor(card.type)} />
+                                <CardImage image={props.hide ? ImageLoader.load("back") : ImageLoader.load(card.image)} color={props.hide ? "black" : _typeToColor(card.type)} />
                             </div>
-                            {(!props.hide) && showHover === card.id && idx % 5 <= 2 && 
-                                <CardHover title={card.title} position={"top"} offset={{x: 150, y: 20}} color=       {_typeToColor(card.type)} text={cardDescription(card, context!.language)} />
+                            {(!props.hide) && showHover === card.id && idx % 5 <= 2 &&
+                                <CardHover title={card.title} position={"top"} offset={{ x: 150, y: 20 }} color={_typeToColor(card.type)} text={cardDescription(card, context!.language)} />
                             }
-                            {(!props.hide) && showHover === card.id && idx % 5 > 2 && 
-                                <CardHover title={card.title} position={"top"} offset={{x: -300, y: 20}} color=       {_typeToColor(card.type)} text={cardDescription(card, context!.language)} />
+                            {(!props.hide) && showHover === card.id && idx % 5 > 2 &&
+                                <CardHover title={card.title} position={"top"} offset={{ x: -300, y: 20 }} color={_typeToColor(card.type)} text={cardDescription(card, context!.language)} />
                             }
                         </Item>
-                        
                     );
                 })}
             </List>
-        </Wrapper>
+        </Wrapper>,
+        document.body
     );
 }
 
 const Wrapper = styled.div`
-    background-image: url(${BG});
-    background-size: cover;
-    position: absolute;
-    height: 100vh;
-    width: 100%;
+    position: fixed;
+    inset: 0;
     z-index: 100000;
     display: flex;
     flex-direction: column;
     align-items: center;
-    overflow: auto;
+    background-color: #241d14;
+    background-image: url(${BG});
+    background-size: cover;
+    background-position: center;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
 `;
 
-const Button = styled.div`
-    background-color: black;
-    color: white;
-    border-radius: 12px;
-    padding: 1em;
+const Header = styled.div`
+    flex: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: max(14px, env(safe-area-inset-top)) 16px 12px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+`;
+
+const BackBtn = styled.button`
+    background: linear-gradient(135deg, #ff5c6e, #c80000);
+    color: #fff;
+    border: 3px solid #fff;
+    border-radius: 999px;
+    padding: 0.6em 1.4em;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+    font-weight: 700;
+    font-size: 13pt;
     cursor: pointer;
-    width: 200px;
+    box-shadow: 0 5px 0 rgba(120, 0, 0, 0.5);
+    &:active {
+        transform: translateY(3px);
+        box-shadow: 0 2px 0 rgba(120, 0, 0, 0.5);
+    }
+`;
+
+const TitleTag = styled.p`
+    margin: 0;
+    padding: 0.7em 1.1em;
+    background-color: #f8b500;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
 `;
 
 const List = styled.div`
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-wrap: wrap;
-    width: 800px;
-    overflow: visible;
+    align-content: flex-start;
+    justify-content: center;
+    gap: 6px;
+    width: min(860px, 100%);
+    padding: 16px 8px 32px;
+    box-sizing: border-box;
 `;
 
 const Item = styled.div`
     position: relative;
 `;
 
-const CardImage = styled.div<{image: string; color: string}>`
-    width: 120px;
-    height: 150px;
+const CardImage = styled.div<{ image: string; color: string }>`
+    width: clamp(96px, 26vw, 128px);
+    height: clamp(120px, 33vw, 160px);
     background-image: url(${props => props.image});
     background-size: cover;
     border-radius: 12px;
     cursor: pointer;
-    margin: 1em;
+    margin: 8px;
     border: 4px solid ${props => props.color};
+    transition: transform 0.12s ease;
+    &:hover {
+        transform: translateY(-6px) scale(1.05);
+    }
 `;
 
 export default Finder;
