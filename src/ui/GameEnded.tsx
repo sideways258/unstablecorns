@@ -2,13 +2,18 @@ import { Screen, Panel, PanelTitle, Button } from './themed';
 import BackButton from './BackButton';
 import { COLORS } from '../theme';
 
-// Shown to every player once the host ends the match (ctx.gameover is set).
-const GameEnded = () => (
+type Props = {
+  title?: string;
+  message?: string;
+};
+
+// Shown to every player when a match ends (host ended it, or a win condition).
+const GameEnded = ({ title = 'Game over', message = 'The host ended the game. Thanks for playing!' }: Props) => (
   <Screen>
     <BackButton />
     <Panel>
-      <PanelTitle>Game over</PanelTitle>
-      <p style={{ color: COLORS.textMuted }}>The host ended the game. Thanks for playing!</p>
+      <PanelTitle>{title}</PanelTitle>
+      <p style={{ color: COLORS.textMuted }}>{message}</p>
       <Button onClick={() => window.location.assign('/')}>Back to home</Button>
     </Panel>
   </Screen>

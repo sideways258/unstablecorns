@@ -40,8 +40,8 @@ exports.__esModule = true;
 var path = require("path");
 var serve = require('koa-static');
 var Server = require('boardgame.io/server').Server;
-var game_1 = require("./game/game");
-var server = Server({ games: [game_1["default"]] });
+var games_1 = require("./games");
+var server = Server({ games: games_1.games });
 // Single listening port for everything: static front-end, game WebSocket, and
 // the boardgame.io lobby REST API are all mounted on this one server. Do NOT
 // set lobbyConfig.apiPort here -- that forks the lobby API onto a second port,

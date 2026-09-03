@@ -3,41 +3,48 @@ import { useHistory, useParams } from 'react-router-dom';
 import { Screen, Panel, PanelTitle, PanelSubtitle, Button } from './ui/themed';
 import BackButton from './ui/BackButton';
 import { COLORS, isValidLobbyCode, normalizeLobbyCode } from './theme';
+import { getGameById } from './games/registry';
 
-type RouteParam = { matchID?: string; numPlayers?: string };
+type RouteParam = { gameId?: string; matchID?: string; numPlayers?: string };
 
-// Shown at "/:code/:numPlayers" - pick which seat you are before entering the
-// pregame lobby. The host shares "<origin>/<code>/<numPlayers>" and each player
-// opens it and taps a different number.
+// "/:gameId/:code/:numPlayers" - pick which seat you are before entering the game.
+// The host shares "<origin>/<gameId>/<code>/<numPlayers>" and each player taps a
+// different number.
 const SeatPicker = () => {
   const history = useHistory();
-  const { matchID, numPlayers } = useParams<RouteParam>();
+  const { gameId, matchID, numPlayers } = useParams<RouteParam>();
   const [copied, setCopied] = useState(false);
 
+  const game = getGameById(gameId);
   const code = normalizeLobbyCode(matchID || '');
   const count = parseInt(numPlayers || '0', 10);
 
   // Keep everyone on the same canonical (upper-case) code.
   useEffect(() => {
-    if (matchID && matchID !== code && isValidLobbyCode(code)) {
-      history.replace(`/${code}/${count}`);
+    if (game && matchID && matchID !== code && isValidLobbyCode(code)) {
+      history.replace(`/${game.id}/${code}/${count}`);
     }
-  }, [matchID, code, count, history]);
+  }, [game, matchID, code, count, history]);
 
-  if (!isValidLobbyCode(code) || !(count >= 2 && count <= 8)) {
+  const badLink =
+    !game || !isValidLobbyCode(code) || !(count >= game.minPlayers && count <= game.maxPlayers);
+
+  if (badLink) {
     return (
       <Screen>
         <BackButton />
         <Panel>
           <PanelTitle>Bad lobby link</PanelTitle>
-          <p style={{ color: COLORS.textMuted }}>That lobby code or player count doesn't look right.</p>
+          <p style={{ color: COLORS.textMuted }}>
+            That game, lobby code or player count doesn&rsquo;t look right.
+          </p>
           <Button onClick={() => history.push('/')}>Back to home</Button>
         </Panel>
       </Screen>
     );
   }
 
-  const inviteLink = `${window.location.origin}/${code}/${count}`;
+  const inviteLink = `${window.location.origin}/${game.id}/${code}/${count}`;
 
   const copyInvite = async () => {
     try {
@@ -53,10 +60,10 @@ const SeatPicker = () => {
     <Screen>
       <BackButton />
       <Panel>
-        <PanelTitle>Lobby {code}</PanelTitle>
+        <PanelTitle>{game.name}</PanelTitle>
         <p style={{ color: COLORS.textMuted, margin: '0 0 0.4em' }}>
-          Share the code <strong style={{ color: COLORS.text }}>{code}</strong> ({count} players), or send the invite
-          link:
+          Lobby <strong style={{ color: COLORS.text }}>{code}</strong> · {count} players. Share the code, or send the
+          invite link:
         </p>
         <div
           style={{
@@ -86,7 +93,7 @@ const SeatPicker = () => {
               <button
                 key={i}
                 disabled={isHostSeat}
-                onClick={() => history.push(`/${code}/${count}/${i}`)}
+                onClick={() => history.push(`/${game.id}/${code}/${count}/${i}`)}
                 style={{
                   padding: '1em 0',
                   borderRadius: 10,

@@ -8,6 +8,9 @@ const serve = require('koa-static');
 const { Server } = require('boardgame.io/server');
 import UnstableUnicorns from './game/game';
 
+// NOTE: the Docker image runs server/server.js, which registers every game via
+// server/games.js. This standalone dev entry only serves Unstable Unicorns.
+
 // Single listening port for everything: static front-end, game WebSocket, and
 // the boardgame.io lobby REST API are all mounted on this one server. Do NOT
 // pass lobbyConfig.apiPort -- that forks the lobby API onto a second port, which

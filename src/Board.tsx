@@ -295,7 +295,7 @@ const Board = (props: any) => {
     if (ctx.phase === "pregame") {
         return (
             <>
-                <BoardGameBegin G={G} babyCards={_.first(G.deck, 13)} playerID={playerID} moves={moves} matchID={props.matchID} />
+                <BoardGameBegin G={G} babyCards={_.first(G.deck, 13)} playerID={playerID} moves={moves} matchID={props.matchID} gameId={props.gameId} />
                 <SettingsMenu isHost={isHost} onEndGame={handleEndGame} />
             </>
         );

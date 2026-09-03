@@ -13,6 +13,7 @@ type Props = {
     playerID: PlayerID,
     moves: any,
     matchID?: string,
+    gameId?: string,
 };
 
 const BoardGameBegin = (props: Props) => {
@@ -24,9 +25,10 @@ const BoardGameBegin = (props: Props) => {
     const hasPick = !!props.G.babyStarter.find(s => s.owner === props.playerID);
 
     const numPlayers = props.G.players.length;
-    const inviteLink = props.matchID
-        ? `${window.location.origin}/${props.matchID}/${numPlayers}`
+    const lobbyPath = props.gameId && props.matchID
+        ? `/${props.gameId}/${props.matchID}/${numPlayers}`
         : "";
+    const inviteLink = lobbyPath ? `${window.location.origin}${lobbyPath}` : "";
 
     const copyInvite = () => {
         if (!inviteLink) return;
@@ -41,13 +43,7 @@ const BoardGameBegin = (props: Props) => {
 
     return (
         <Wrapper>
-            <BackButton
-                to={
-                    props.playerID === "0" || !props.matchID
-                        ? "/"
-                        : `/${props.matchID}/${numPlayers}`
-                }
-            />
+            <BackButton to={props.playerID === "0" || !lobbyPath ? "/" : lobbyPath} />
             <div style={{
                 display: "flex",
                 width: "100%",

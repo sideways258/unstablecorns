@@ -1,49 +1,78 @@
+import { useMemo } from 'react';
 import { Client } from 'boardgame.io/react';
 import { SocketIO } from 'boardgame.io/multiplayer';
 import { useParams } from 'react-router-dom';
-import Board from './Board';
-import UnstableUnicorns from './game/game';
+import { getGameById, DEFAULT_GAME_ID } from './games/registry';
+import { Screen, Panel, PanelTitle, Button } from './ui/themed';
+import BackButton from './ui/BackButton';
 
 type RouteParam = {
+    gameId?: string;
     numPlayers?: string;
     playerID?: string;
     matchID?: string;
-}
+};
 
 type Props = {
     debug?: string;
-}
+};
 
-const UnstableUnicornsClient = ({ debug }: Props) => {
-    const { numPlayers, playerID, matchID } = useParams<RouteParam>();
+const GameClient = ({ debug }: Props) => {
+    const { gameId, numPlayers, playerID, matchID } = useParams<RouteParam>();
+    const isTest = debug === 'test';
 
-    if (debug === "test") {
-        const UnstableUnicornsClient = Client({
-            game: UnstableUnicorns,
-            board: Board,
-            numPlayers: 3,
-            //multiplayer: SocketIO({ server: `localhost:8000` }),
+    const def = getGameById(isTest ? DEFAULT_GAME_ID : gameId);
+    const seats = isTest ? 3 : numPlayers ? parseInt(numPlayers, 10) : 0;
+
+    // Build the boardgame.io client once per (game, lobby) so it doesn't
+    // reconnect the socket on every parent re-render.
+    const BgClient = useMemo(() => {
+        if (!def || (!isTest && !seats)) return null;
+        const board = (boardProps: any) => {
+            const Board = def.board;
+            // Inject the url game id so boards can build invite / back links.
+            return <Board {...boardProps} gameId={def.id} />;
+        };
+        return Client({
+            game: def.bgGame,
+            board,
+            numPlayers: seats,
+            ...(isTest
+                ? {}
+                : {
+                      multiplayer: SocketIO({
+                          server: `${window.location.protocol}//${window.location.host}`,
+                      }),
+                  }),
         });
+    }, [def, isTest, seats]);
 
-        return <UnstableUnicornsClient matchID={"test"} playerID={"0"} />
+    if (!def) {
+        return (
+            <Screen>
+                <BackButton />
+                <Panel>
+                    <PanelTitle>Unknown game</PanelTitle>
+                    <p>No game called &ldquo;{gameId}&rdquo;.</p>
+                    <Button onClick={() => (window.location.href = '/')}>Back to home</Button>
+                </Panel>
+            </Screen>
+        );
     }
 
-    let UnstableUnicornsClient = null;
-    if (numPlayers) {
-        UnstableUnicornsClient = Client({
-            game: UnstableUnicorns,
-            board: Board,
-            numPlayers: parseInt(numPlayers),
-            //multiplayer: SocketIO({ server: `localhost:8000` }),
-            // Connect back to whatever host/port/protocol the page was served from,
-            // so it works on http://<unraid-ip>:8090 as well as behind an https proxy.
-            multiplayer: SocketIO({ server: `${window.location.protocol}//${window.location.host}` }),
-        });
-    } else {
-        return (<h1>Num players argument is missing</h1>);
+    if (!BgClient) {
+        return (
+            <Screen>
+                <BackButton />
+                <Panel>
+                    <PanelTitle>Missing lobby info</PanelTitle>
+                    <Button onClick={() => (window.location.href = '/')}>Back to home</Button>
+                </Panel>
+            </Screen>
+        );
     }
-    
-    return <UnstableUnicornsClient matchID={matchID} playerID={playerID} />
-}
 
-export default UnstableUnicornsClient;
+    return <BgClient matchID={isTest ? 'test' : matchID} playerID={isTest ? '0' : playerID} />;
+};
+
+export default GameClient;

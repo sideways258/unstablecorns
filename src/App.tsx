@@ -10,19 +10,21 @@ const App = () => {
       <Router>
         <Switch>
           <Route path="/test">
-            <Client debug={"test"}/>
+            <Client debug={"test"} />
           </Route>
           <Route exact path="/join/:code">
-              <JoinResolver />
+            <JoinResolver />
           </Route>
-          <Route path="/:matchID/:numPlayers/:playerID">
-              <Client />
+          {/* /:gameId/:matchID/:numPlayers/:playerID */}
+          <Route path="/:gameId/:matchID/:numPlayers/:playerID">
+            <Client />
           </Route>
-          <Route exact path="/:matchID/:numPlayers">
-              <SeatPicker />
+          {/* /:gameId/:matchID/:numPlayers */}
+          <Route exact path="/:gameId/:matchID/:numPlayers">
+            <SeatPicker />
           </Route>
           <Route exact path="/">
-              <Landing />
+            <Landing />
           </Route>
         </Switch>
       </Router>

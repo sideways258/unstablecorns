@@ -3,16 +3,14 @@ import { useHistory, useParams } from 'react-router-dom';
 import { Screen, Panel, PanelTitle, Button } from './ui/themed';
 import BackButton from './ui/BackButton';
 import { COLORS, isValidLobbyCode, normalizeLobbyCode } from './theme';
-
-// Must match UnstableUnicorns.name in ./game/game.
-const GAME_NAME = 'unstable_unicorns';
+import { GAMES } from './games/registry';
 
 type RouteParam = { code?: string };
 type State = 'looking' | 'notfound' | 'bad';
 
-// "/join/:code" - asks the server how many players the lobby has (the joiner
-// never sets that) via the boardgame.io lobby REST API, then forwards to the
-// seat picker. Retries until the host has opened the lobby.
+// "/join/:code" - finds which game the lobby belongs to and how many players it
+// has by querying the boardgame.io lobby REST API for each registered game, then
+// forwards to that game's seat picker. Retries until the host opens the lobby.
 const JoinResolver = () => {
   const history = useHistory();
   const { code: rawCode } = useParams<RouteParam>();
@@ -21,22 +19,25 @@ const JoinResolver = () => {
   const [state, setState] = useState<State>(isValidLobbyCode(code) ? 'looking' : 'bad');
 
   const lookup = useCallback(async () => {
-    try {
-      const res = await fetch(`${window.location.origin}/games/${GAME_NAME}/${encodeURIComponent(code)}`);
-      if (!res.ok) {
-        setState('notfound');
-        return;
+    for (const g of GAMES) {
+      const serverName = g.bgGame && g.bgGame.name;
+      if (!serverName) continue;
+      try {
+        const res = await fetch(
+          `${window.location.origin}/games/${encodeURIComponent(serverName)}/${encodeURIComponent(code)}`
+        );
+        if (!res.ok) continue;
+        const data = await res.json();
+        const count = Array.isArray(data?.players) ? data.players.length : 0;
+        if (count >= g.minPlayers && count <= g.maxPlayers) {
+          history.replace(`/${g.id}/${code}/${count}`);
+          return;
+        }
+      } catch (e) {
+        /* try the next game */
       }
-      const data = await res.json();
-      const count = Array.isArray(data?.players) ? data.players.length : 0;
-      if (count >= 2 && count <= 8) {
-        history.replace(`/${code}/${count}`);
-        return;
-      }
-      setState('notfound');
-    } catch (e) {
-      setState('notfound');
     }
+    setState('notfound');
   }, [code, history]);
 
   useEffect(() => {
@@ -61,7 +62,7 @@ const JoinResolver = () => {
         {state === 'looking' && (
           <>
             <PanelTitle>Joining {code}&hellip;</PanelTitle>
-            <p style={{ color: COLORS.textMuted }}>Looking up the lobby.</p>
+            <p style={{ color: COLORS.textMuted }}>Finding the lobby.</p>
           </>
         )}
         {state === 'notfound' && (
