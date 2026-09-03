@@ -25,6 +25,7 @@ var constants_1 = require("./constants");
 var do_2 = require("./do");
 var underscore_1 = require("underscore");
 var core_1 = require("boardgame.io/core");
+var funnyNames_1 = require("../funnyNames");
 var UnstableUnicorns = {
     name: "unstable_unicorns",
     // Ends the whole match the moment the host asks for it (see the endMatch move).
@@ -36,10 +37,11 @@ var UnstableUnicorns = {
     // Available in every phase/stage so the host can always bail out.
     moves: { endMatch: endMatch },
     setup: function (ctx, setupData) {
+        var funny = funnyNames_1.funnyNames(ctx.numPlayers);
         var players = Array.from({ length: ctx.numPlayers }, function (val, idx) {
             return {
                 id: "" + idx,
-                name: "Spieler " + idx
+                name: funny[idx]
             };
         });
         var deck = card_1.initializeDeck();

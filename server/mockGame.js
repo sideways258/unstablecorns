@@ -3,6 +3,7 @@
 exports.__esModule = true;
 
 var core_1 = require("boardgame.io/core");
+var funnyNames_1 = require("./funnyNames");
 
 function shuffle(input) {
   var a = input.slice();
@@ -79,6 +80,7 @@ function createMockGame(config) {
         });
       }
       var pile = shuffle(ids);
+      var funny = funnyNames_1.funnyNames(ctx.numPlayers);
 
       var hands = {};
       var names = {};
@@ -87,7 +89,7 @@ function createMockGame(config) {
         var id = String(i);
         hands[id] = pile.slice(0, handSize);
         pile = pile.slice(handSize);
-        names[id] = "";
+        names[id] = funny[i];
         ready[id] = false;
       }
       return {

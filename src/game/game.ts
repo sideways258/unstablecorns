@@ -9,6 +9,7 @@ import { executeDo } from './do';
 import { Effect } from './effect';
 import _ from 'underscore';
 import type { NeighDiscussion } from './neigh';
+import { funnyNames } from '../funnyNames';
 
 export type { Ctx };
 
@@ -91,10 +92,11 @@ const UnstableUnicorns = {
     // Available in every phase/stage so the host can always bail out.
     moves: { endMatch },
     setup: (ctx: Ctx, setupData: any): UnstableUnicornsGame => {
+        const funny = funnyNames(ctx.numPlayers);
         const players: Player[] = Array.from({ length: ctx.numPlayers }, (val, idx) => {
             return {
                 id: `${idx}`,
-                name: `Spieler ${idx}`,
+                name: funny[idx],
             };
         });
 

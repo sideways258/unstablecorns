@@ -19,7 +19,10 @@ type Props = {
 };
 
 const BoardGameBegin = (props: Props) => {
-    const [playerName, setPlayerName] = useState<string>('Spieler');
+    const [playerName, setPlayerName] = useState<string>(() => {
+        const me = props.G.players.find((p) => String(p.id) === String(props.playerID));
+        return (me && me.name) || 'Player';
+    });
     const [nameSaved, setNameSaved] = useState<boolean>(false);
 
     const isReady = props.G.ready[props.playerID] === true;

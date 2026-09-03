@@ -1,5 +1,6 @@
 import { INVALID_MOVE } from 'boardgame.io/core';
 import type { MockCard } from './mockCards';
+import { funnyNames } from '../funnyNames';
 
 // A tiny but real boardgame.io game used as scaffolding for new games. It has a
 // lobby phase (name + ready-up, same as Unstable Unicorns), then a play phase
@@ -93,6 +94,7 @@ export function createMockGame(config: { name: string; deck: MockCard[]; handSiz
         config.deck.forEach((c) => ids.push(c.id));
       }
       let pile = shuffle(ids);
+      const funny = funnyNames(ctx.numPlayers);
 
       const hands: Record<string, string[]> = {};
       const names: Record<string, string> = {};
@@ -101,7 +103,7 @@ export function createMockGame(config: { name: string; deck: MockCard[]; handSiz
         const id = String(i);
         hands[id] = pile.slice(0, handSize);
         pile = pile.slice(handSize);
-        names[id] = '';
+        names[id] = funny[i];
         ready[id] = false;
       }
       return { cards: cardsById, drawPile: pile, discard: [], table: [], hands, names, ready, log: [], endGame: false };

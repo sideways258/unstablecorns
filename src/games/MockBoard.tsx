@@ -24,7 +24,9 @@ type Props = {
 const MockBoard = (props: Props) => {
   const { G, ctx, moves, playerID, matchID, gameId } = props;
   const [copied, setCopied] = useState(false);
-  const [lobbyName, setLobbyName] = useState('');
+  const [lobbyName, setLobbyName] = useState<string>(() =>
+    playerID != null ? G.names[playerID] || '' : ''
+  );
   const [nameSaved, setNameSaved] = useState(false);
 
   if (ctx.gameover) {
