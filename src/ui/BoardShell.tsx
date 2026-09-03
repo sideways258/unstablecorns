@@ -5,7 +5,7 @@ import styled from 'styled-components';
 // we render it at a fixed design size and scale the whole thing down to fit the
 // viewport (letter-boxed on a wooden "table"). Pinch-zoom still works for detail.
 const DESIGN_W = 1440;
-const DESIGN_H = 900;
+const DESIGN_H = 820;
 
 const BoardShell = ({ children }: { children: ReactNode }) => {
   const [scale, setScale] = useState(1);

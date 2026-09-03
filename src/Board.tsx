@@ -732,6 +732,7 @@ const Board = (props: any) => {
                             }
                         }}
                     />
+                    <HandDock>
                     {renderHand(G, ctx, moves, playerID, boardStates, cardInteraction, setCardInteraction,
                         (index) => {
                             setHoveringOverHandCard(true);
@@ -754,6 +755,7 @@ const Board = (props: any) => {
                                 moves.setUIHoverHandIndex(undefined);
                             }
                         }, openScenes)}
+                    </HandDock>
                 </Bottom>
             </Wrapper>
           </BoardShell>
@@ -1058,7 +1060,7 @@ const Wrapper = styled(motion.div)`
     &::before {
         content: '';
         position: absolute;
-        inset: 26px 96px 30px;
+        inset: 20px 88px 8px;
         border-radius: 90px / 120px;
         pointer-events: none;
         z-index: 0;
@@ -1072,8 +1074,8 @@ const Wrapper = styled(motion.div)`
 `;
 
 const Top = styled.div`
-    position: absolute; 
-    top: 0;
+    position: absolute;
+    top: 40px;
     z-index: 2;
     height: 50px;
 `;
@@ -1117,12 +1119,20 @@ const DrawPileWrapper = styled.div<{ zIndexFocus: boolean }>`
 
 const Bottom = styled.div`
     position: absolute;
-    bottom: 150px;
+    bottom: -40px;
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     z-index: 2000;
+`;
+
+/* pulls the hand up so it tucks just under the stable instead of stacking
+   below it and pushing everything into the centre of the table */
+const HandDock = styled.div`
+    position: relative;
+    margin-top: -64px;
+    z-index: 6;
 `;
 
 const EndTurnButtonWrapper = styled.div`
