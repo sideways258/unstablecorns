@@ -1058,6 +1058,20 @@ const Wrapper = styled(motion.div)`
     align-items: center;
     /* keep the play area vertically centred; 'safe' avoids clipping if it ever overflows */
     justify-content: safe center;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+
+    /* warm candy vignette + corner glows, on-theme with the wood board */
+    &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background:
+            radial-gradient(900px 600px at 8% 0%, rgba(248, 181, 0, 0.18), transparent 60%),
+            radial-gradient(900px 600px at 100% 100%, rgba(188, 71, 71, 0.28), transparent 60%),
+            radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.42) 100%);
+    }
 `;
 
 const Top = styled.div`

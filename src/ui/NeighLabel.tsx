@@ -103,16 +103,20 @@ const NeighLabel = (props: Props) => {
 }
 
 const Wrapper = styled(motion.div)`
-    background-color: rgba(0,0,0,0.6);
-    font-family: Open Sans Condensed;
+    background: linear-gradient(180deg, rgba(30, 14, 26, 0.85), rgba(20, 10, 18, 0.92));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 2px solid rgba(255, 255, 255, 0.16);
+    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
     color: white;
-    padding: 1em;
-    border-radius: 16px;
+    padding: 1em 1.4em;
+    border-radius: 18px;
     margin-top: 1em;
     display: flex;
     flex-direction: row;
     justify-content: center;
     align-items: center;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.45);
 `;
 
 const glow = keyframes`
@@ -132,18 +136,30 @@ const CardImage = styled(motion.img)`
     animation: ${glow} 1s infinite alternate;
 `;
 
-const DontNeighButton = styled.div`
-    padding: 0.5em;
+const chunky = `
+    padding: 0.6em 1.1em;
     border-radius: 12px;
-    background-color: red;
     cursor: pointer;
+    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
+    font-weight: 600;
+    color: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    user-select: none;
+    transition: transform 0.08s ease, filter 0.15s ease;
+    &:hover { filter: brightness(1.1); }
+    &:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.35) !important; }
+`;
+
+const DontNeighButton = styled.div`
+    ${chunky}
+    background: linear-gradient(135deg, #ff6b6b, #c81d25);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
 `;
 
 const NeighButton = styled.div`
-padding: 0.5em;
-border-radius: 12px;
-background-color: green;
-cursor: pointer;
+    ${chunky}
+    background: linear-gradient(135deg, #4ade80, #148f4b);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
 `;
 
 export default NeighLabel;

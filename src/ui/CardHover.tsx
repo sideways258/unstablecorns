@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 
 type Props = {
     color: string;
@@ -45,13 +45,22 @@ const Wrapper = styled.div<{offset: {x: number, y: number}, position: "top" | "b
     transform: translate(${props => `${props.offset.x}px, ${props.offset.y}px`}) scale(${props => props.scale ? props.scale : 1});
 `;
 
+const hoverIn = keyframes`
+    from { opacity: 0; transform: translateY(6px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+`;
+
 const InnerWrapper = styled.div<{color: string}>`
     background-color: ${props => props.color};
     border-radius: 16px;
-    padding: 20px;
+    padding: 18px 20px;
     color: ${props => props.color === "#FFFFFF" ? "black" : "white"};
-    box-shadow: 4px 4px 0 4px #00213A;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+    line-height: 1.35;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 5px 6px 0 2px rgba(0, 33, 58, 0.55), 0 18px 40px rgba(0, 0, 0, 0.4);
     cursor: default;
+    animation: ${hoverIn} 0.14s ease both;
 `;
 
 export default CardHover;

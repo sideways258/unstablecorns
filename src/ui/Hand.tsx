@@ -92,7 +92,7 @@ const Wrapper = styled.div`
 `;
 
 const CardWrapper = styled.div<{ bringToForeground: boolean, borderColor: string, transform: { x: number, y: number, rotate: string }, isGlowing: boolean }>`
-    border-radius: 16px;
+    border-radius: 18px;
     width: 175px;
     height: 250px;
     display: flex;
@@ -101,11 +101,14 @@ const CardWrapper = styled.div<{ bringToForeground: boolean, borderColor: string
     background-color: white;
     border: 8px solid ${props => props.borderColor};
     transform: translate(${props => props.transform.x}px, ${props => props.transform.y}px) rotate(${props => props.transform.rotate});
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.28), 0 2px 4px rgba(0,0,0,0.22);
     transition: all 0.3s cubic-bezier(.25,.8,.25,1);
     animation: ${props => props.isGlowing ? css`${glow} 1s infinite alternate` : 'null'};
     :hover {
         transform: translate(${props => props.transform.x}px, -90%) scale(1.5);
+        box-shadow: 0 30px 55px rgba(0,0,0,0.45);
+        filter: drop-shadow(0 0 16px rgba(255, 209, 102, 0.55));
+        z-index: 50;
     }
     cursor: pointer;
     z-index: ${props => props.bringToForeground ? 4 : 0 };
@@ -122,14 +125,16 @@ const Top = styled.div`
 const Type = styled.div<{ fontColor: string }>`
     display: flex;
     align-content: center;
-    font-weight: bold;
+    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
+    font-weight: 600;
     font-size: 0.9em;
     color: ${props => props.fontColor};
 `;
 
 const Title = styled.div`
-    font-weight: bold;
-    font-size: 1.1em;
+    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 1.15em;
 `;
 
 const CardImage = styled.div<{ image: string }>`

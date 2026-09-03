@@ -143,6 +143,11 @@ const StableItem = styled.div`
     padding: 0 0.5em;
     cursor: pointer;
     position: relative;
+    transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1);
+    &:hover {
+        transform: translateY(-10px) scale(1.14);
+        z-index: 20;
+    }
 `;
 
 const glow = keyframes`
@@ -177,18 +182,26 @@ const MiniCardImage = styled(motion.img)<{color: string, isGlowing: boolean, isT
 `;
 
 const Placeholder = styled.div`
-    background-color: rgba(0,0,0,0.2);
+    background-color: rgba(0,0,0,0.18);
     width: 100%;
     margin-left: 1em;
     border-radius: 12px;
+    border: 2px dashed rgba(255, 255, 255, 0.35);
     display: flex;
     justify-content: center;
     align-items: center;
-    font-family: Open Sans Condensed;
-    color: rgba(0,0,0,0.6);
-    font-size: 1.4em;
+    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.3em;
     cursor: pointer;
     user-select: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    &:hover {
+        background-color: rgba(248, 181, 0, 0.22);
+        border-color: rgba(255, 209, 102, 0.8);
+        color: #fff;
+    }
 `;
 
 // keyframes

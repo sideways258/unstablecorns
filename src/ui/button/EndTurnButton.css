@@ -18,19 +18,25 @@
     left: 0;
     bottom: 0;
     right: 0;
-    background: linear-gradient(135deg, #FF4450, #C80000);
-    border-radius: 12px;
+    background: linear-gradient(135deg, #FF5C6E, #C80000);
+    border-radius: 14px;
+    border: 3px solid #fff;
     -webkit-transition: box-shadow .5s ease, -webkit-transform .2s ease;
     transition: box-shadow .5s ease, -webkit-transform .2s ease;
     transition: box-shadow .5s ease, transform .2s ease;
     transition: box-shadow .5s ease, transform .2s ease, -webkit-transform .2s ease;
     will-change: transform;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 0 rgba(120, 0, 0, 0.55), 0 12px 22px rgba(0, 0, 0, 0.35);
+    animation: endturn-glow 1.8s ease-in-out infinite;
     -webkit-transform: translateY(var(--ty, 0)) rotateX(var(--rx, 0)) rotateY(var(--ry, 0)) translateZ(var(--tz, -12px));
             transform: translateY(var(--ty, 0)) rotateX(var(--rx, 0)) rotateY(var(--ry, 0)) translateZ(var(--tz, -12px));
   }
   .parallaxbutton:hover::before {
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 6px 0 rgba(120, 0, 0, 0.55), 0 16px 30px rgba(0, 0, 0, 0.4), 0 0 22px rgba(255, 209, 102, 0.65);
+  }
+  @keyframes endturn-glow {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 209, 102, 0)); }
+    50%      { filter: drop-shadow(0 0 14px rgba(255, 209, 102, 0.55)); }
   }
   .parallaxbutton::after {
     position: relative;
@@ -40,8 +46,10 @@
     transition: -webkit-transform .2s ease;
     transition: transform .2s ease;
     transition: transform .2s ease, -webkit-transform .2s ease;
-    font-weight: bold;
-    letter-spacing: .01em;
+    font-family: 'Fredoka', 'Open Sans Condensed', sans-serif;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
     will-change: transform;
     -webkit-transform: translateY(var(--ty, 0)) rotateX(var(--rx, 0)) rotateY(var(--ry, 0));
             transform: translateY(var(--ty, 0)) rotateX(var(--rx, 0)) rotateY(var(--ry, 0));

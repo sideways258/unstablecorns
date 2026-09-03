@@ -42,6 +42,12 @@ const Wrapper = styled.div`
     border: 4px solid rgba(0,0,0,0.5);
     border-radius: 16px;
     transform: rotate(-8deg);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+    transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 0.16s ease;
+    &:hover {
+        transform: rotate(-4deg) translateY(-10px) scale(1.08);
+        box-shadow: 0 18px 30px rgba(0, 0, 0, 0.45);
+    }
 `;
 
 const CardImage = styled.div<{image: string}>`

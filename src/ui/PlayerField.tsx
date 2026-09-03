@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
 import type { Player, PlayerID } from "../game/player";
 import ImageLoader from '../assets/card/imageLoader';
 import { _typeToColor } from './util';
@@ -127,6 +127,11 @@ const Wrapper = styled.div`
     justify-content: center;
 `;
 
+const currentGlow = keyframes`
+    0%, 100% { box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.9), 0 0 18px 2px rgba(255, 209, 102, 0.35); }
+    50%      { box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.9), 0 0 28px 8px rgba(255, 209, 102, 0.55); }
+`;
+
 const PlayerBox = styled.div<{ current: boolean }>`
     width: 180px;
     height: 220px;
@@ -134,6 +139,7 @@ const PlayerBox = styled.div<{ current: boolean }>`
     border-radius: 16px;
     margin: 0.6em;
     padding: 0.5em;
+    animation: ${props => props.current ? css`${currentGlow} 2s ease-in-out infinite` : 'none'};
 `;
 
 const InnerBox = styled.div`
@@ -141,17 +147,19 @@ const InnerBox = styled.div`
     width: 100%;
     border-radius: 12px;
     background-color: #BC4747;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.24);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(.25,.8,.25,1);
     :hover {
-        box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+        transform: translateY(-6px) scale(1.02);
+        box-shadow: 0 18px 32px rgba(0,0,0,0.32), 0 10px 10px rgba(0,0,0,0.22);
     }
 `;
 
 const Title = styled.div`
     color: white;
-    font-family: Open Sans;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+    font-weight: 600;
     padding: 0.5em 0.5em 0 0.5em;
     font-size: 1.2em;
     display: flex;
