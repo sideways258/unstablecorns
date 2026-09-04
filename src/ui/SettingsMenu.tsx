@@ -23,7 +23,7 @@ type Props = {
 // "end game for everyone" action.
 const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }: Props) => {
   const history = useHistory();
-  const { volume, muted, setVolume, toggleMuted } = useAudioSettings();
+  const { volume, muted, tavernMuted, setVolume, toggleMuted, toggleTavernMuted } = useAudioSettings();
   const { themeID, setThemeID } = useBoardTheme();
   const [open, setOpen] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -70,6 +70,17 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }:
             />
             <Percent>{Math.round((muted ? 0 : volume) * 100)}%</Percent>
           </VolumeRow>
+          <TavernRow>
+            <span>Tavern sounds</span>
+            <TavernToggle
+              type="button"
+              $on={!tavernMuted}
+              onClick={toggleTavernMuted}
+              title={tavernMuted ? 'Turn tavern sounds on' : 'Turn tavern sounds off'}
+            >
+              {tavernMuted ? 'Off' : 'On'}
+            </TavernToggle>
+          </TavernRow>
 
           <SectionTitle>Table color</SectionTitle>
           <SwatchRow>
@@ -235,6 +246,28 @@ const VolumeRow = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
+`;
+
+const TavernRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 10.5pt;
+  color: #fff;
+`;
+
+const TavernToggle = styled.button<{ $on: boolean }>`
+  min-width: 52px;
+  padding: 0.4em 0.7em;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 10pt;
+  cursor: pointer;
+  border: 2px solid #fff;
+  color: #fff;
+  background: ${(p) => (p.$on ? 'linear-gradient(135deg, #37d9a0, #1f9c74)' : 'transparent')};
 `;
 
 const MuteButton = styled.button`

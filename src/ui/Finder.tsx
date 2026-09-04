@@ -16,6 +16,10 @@ type Props = {
     onCardClick: (cardID: CardID) => void;
     title?: string;
     hide?: boolean;
+    /** if provided, only these cards can be clicked - every other card is
+     *  shown dimmed and inert (e.g. non-Unicorn cards while reviving a
+     *  Unicorn from the discard pile). Undefined means every card is live. */
+    selectableCardIDs?: CardID[];
 }
 
 const Finder = (props: Props) => {
@@ -35,10 +39,15 @@ const Finder = (props: Props) => {
 
             <List>
                 {props.cards.map((card, idx) => {
+                    const selectable = !props.selectableCardIDs || props.selectableCardIDs.indexOf(card.id) !== -1;
                     return (
                         <Item key={card.id} onMouseEnter={() => setShowHover(card.id)} onMouseLeave={() => setShowHover(undefined)}>
-                            <div onClick={() => props.onCardClick(card.id)}>
-                                <CardImage image={props.hide ? ImageLoader.load("back") : ImageLoader.load(card.image)} color={props.hide ? "black" : _typeToColor(card.type)} />
+                            <div onClick={() => selectable && props.onCardClick(card.id)}>
+                                <CardImage
+                                    image={props.hide ? ImageLoader.load("back") : ImageLoader.load(card.image)}
+                                    color={props.hide ? "black" : _typeToColor(card.type)}
+                                    $disabled={!selectable}
+                                />
                             </div>
                             {(!props.hide) && showHover === card.id && idx % 5 <= 2 &&
                                 <CardHover title={card.title} position={"top"} offset={{ x: 150, y: 20 }} color={_typeToColor(card.type)} text={cardDescription(card, context!.language)} />
@@ -128,18 +137,20 @@ const Item = styled.div`
     position: relative;
 `;
 
-const CardImage = styled.div<{ image: string; color: string }>`
+const CardImage = styled.div<{ image: string; color: string; $disabled?: boolean }>`
     width: clamp(96px, 26vw, 128px);
     height: clamp(120px, 33vw, 160px);
     background-image: url(${props => props.image});
     background-size: cover;
     border-radius: 12px;
-    cursor: pointer;
+    cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
     margin: 8px;
     border: 4px solid ${props => props.color};
-    transition: transform 0.12s ease;
+    opacity: ${props => props.$disabled ? 0.35 : 1};
+    filter: ${props => props.$disabled ? 'grayscale(0.7)' : 'none'};
+    transition: transform 0.12s ease, opacity 0.12s ease;
     &:hover {
-        transform: translateY(-6px) scale(1.05);
+        transform: ${props => props.$disabled ? 'none' : 'translateY(-6px) scale(1.05)'};
     }
 `;
 

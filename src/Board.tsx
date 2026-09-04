@@ -4,7 +4,7 @@ import Hand from './ui/Hand';
 import HiddenHand from './ui/HiddenHand';
 import Stable, { StableHandle } from './ui/Stable';
 import PlayerField, { PlayerFieldHandle } from './ui/PlayerField';
-import useSound from './audio';
+import useSound, { useTavernSound } from './audio';
 import { useBoardTheme } from './boardTheme';
 import { motion, AnimateSharedLayout, AnimatePresence } from "framer-motion";
 // game
@@ -105,11 +105,11 @@ const Board = (props: any) => {
         volume: 0.3,
     });
 
-    const [playNeighSuccessSound] = useSound(NeighSuccessSound, {
+    const [playNeighSuccessSound] = useTavernSound(NeighSuccessSound, {
         volume: 0.2,
     });
 
-    const [playNeighFailureSound] = useSound(NeighFailureSound, {
+    const [playNeighFailureSound] = useTavernSound(NeighFailureSound, {
         volume: 0.2,
     });
 
@@ -238,6 +238,16 @@ const Board = (props: any) => {
     const stableHighlightMode = hoverTargets?.targets.filter(s => s.type === "stable_card").map(s => s.info.cardID).concat([hoverTargets.sourceCardID]);
 
     const boardStates = getBoardState(G, ctx, playerID);
+
+    // While a card like Second Wind (revive) or Dumpster Dip (add from
+    // discard) is picking from the discard pile, only its actual valid
+    // targets (e.g. Unicorn cards) should be clickable there - everything
+    // else in the pile is shown but disabled, whichever way the discard pile
+    // Finder was opened.
+    const discardPileTargetState = boardStates.find(s => s.type === "revive" || s.type === "addFromDiscardPileToHand__single_action_popup");
+    const discardPileSelectableIDs: CardID[] | undefined = discardPileTargetState
+        ? ((discardPileTargetState.info?.targets || []) as { cardID: CardID }[]).map(t => t.cardID)
+        : undefined;
 
     // Hands that "Glass Walls" (your_hand_is_visible) has turned face-up for
     // everyone - shown permanently under that player's field, no clicking needed.
@@ -480,9 +490,10 @@ const Board = (props: any) => {
                     <Finder
                         cards={showDiscardFinder.map(c => G.deck[c.cardID])}
                         onBackClick={() => setShowDiscardFinder(undefined)}
+                        selectableCardIDs={discardPileSelectableIDs}
                         onCardClick={cardID => {
                             let state = boardStates.find(s => s.type === "revive" || s.type === "addFromDiscardPileToHand__single_action_popup");
-                            if (state) {
+                            if (state && (state.info?.targets || []).some((t: { cardID: CardID }) => t.cardID === cardID)) {
                                 moves.executeDo(state.info?.instructionID, {
                                     protagonist: playerID, cardID
                                 });
