@@ -50,7 +50,8 @@ function leave(G, ctx, param) {
                         id: underscore_1["default"].uniqueId(),
                         protagonist: param.playerID,
                         state: "open",
-                        "do": on["do"].info.instruction["do"],
+                        // deep-clone: see the matching comment in game.js's _addSceneFromDo
+                        "do": JSON.parse(JSON.stringify(on["do"].info.instruction["do"])),
                         ui: __assign(__assign({}, on["do"].info.instruction.ui), { info: __assign({ source: card.id }, on["do"].info.instruction.ui.info) })
                     }]
             };
@@ -177,7 +178,8 @@ function enter(G, ctx, param) {
                         id: underscore_1["default"].uniqueId(),
                         protagonist: param.playerID,
                         state: "open",
-                        "do": on["do"].info.instruction["do"],
+                        // deep-clone: see the matching comment in game.js's _addSceneFromDo
+                        "do": JSON.parse(JSON.stringify(on["do"].info.instruction["do"])),
                         ui: __assign(__assign({}, on["do"].info.instruction.ui), { info: __assign({ source: card.id }, on["do"].info.instruction.ui.info) })
                     }]
             };

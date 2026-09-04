@@ -794,7 +794,12 @@ function _addSceneFromDo(G, ctx, cardID, owner, trigger) {
                                 id: underscore_1["default"].uniqueId(),
                                 protagonist: pid,
                                 state: "open",
-                                "do": c["do"],
+                                // deep-clone: c["do"] comes from the static card definition
+                                // and is shared by every copy of this card and every future
+                                // turn; executeDo mutates do.info.count in place, so without
+                                // cloning a card's second-ever activation would find count
+                                // already exhausted and never mark itself executed.
+                                "do": JSON.parse(JSON.stringify(c["do"])),
                                 ui: __assign(__assign({}, c.ui), { info: __assign({ source: card.id }, c.ui.info) })
                             });
                         });

@@ -38,7 +38,8 @@ function leave(G: UnstableUnicornsGame, ctx: Ctx, param: ParamLeave) {
                     id: _.uniqueId(),
                     protagonist: param.playerID,
                     state: "open",
-                    do: on.do.info.instruction.do,
+                    // deep-clone: see the matching comment in game.ts's _addSceneFromDo
+                    do: JSON.parse(JSON.stringify(on.do.info.instruction.do)),
                     ui: { ...on.do.info.instruction.ui, info: { source: card.id, ...on.do.info.instruction.ui.info } },
                 }]
             };
@@ -183,7 +184,8 @@ export function enter(G: UnstableUnicornsGame, ctx: Ctx, param: ParamEnter) {
                     id: _.uniqueId(),
                     protagonist: param.playerID,
                     state: "open",
-                    do: on.do.info.instruction.do,
+                    // deep-clone: see the matching comment in game.ts's _addSceneFromDo
+                    do: JSON.parse(JSON.stringify(on.do.info.instruction.do)),
                     ui: { ...on.do.info.instruction.ui, info: { source: card.id, ...on.do.info.instruction.ui.info } },
                 }]
             };

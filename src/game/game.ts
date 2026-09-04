@@ -952,7 +952,15 @@ export function _addSceneFromDo(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardI
                                 id: _.uniqueId(),
                                 protagonist: pid,
                                 state: "open",
-                                do: c.do,
+                                // Deep-clone: `c.do` comes straight from the static card
+                                // definition and is shared by every copy of this card and
+                                // every future turn. executeDo mutates do.info.count in
+                                // place (discard/destroy), so without cloning, a card's
+                                // second-ever activation anywhere in the game would find
+                                // count already exhausted and never mark itself executed -
+                                // permanently stalling the next step (e.g. a "discard, then
+                                // draw" card would stop letting you draw after turn one).
+                                do: JSON.parse(JSON.stringify(c.do)),
                                 ui: { ...c.ui, info: { source: card.id, ...c.ui.info } },
                             });
                         });
