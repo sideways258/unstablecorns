@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { FONT_DISPLAY, COLORS } from '../theme';
 import { highlightNames } from './highlightNames';
+import ImageLoader from '../assets/card/imageLoader';
+import { _typeToColor } from './util';
 
 export type LogEntry = {
   id: string;
@@ -11,6 +13,8 @@ export type LogEntry = {
   playerID: string;
   playerName: string;
   text: string;
+  cardID?: number;
+  cardTitle?: string;
   ts: number;
 };
 
@@ -21,7 +25,10 @@ const AuditLog = (props: any) => {
   const entries: LogEntry[] = G && Array.isArray(G.auditLog) ? G.auditLog : [];
   const names: string[] = G && Array.isArray(G.players) ? G.players.map((p: any) => p.name) : [];
 
+  const deck: any[] = G && Array.isArray(G.deck) ? G.deck : [];
+
   const [open, setOpen] = useState(false);
+  const [previewID, setPreviewID] = useState<number | undefined>(undefined);
   const listRef = useRef<HTMLDivElement>(null);
 
   // keep the newest entry in view while the window is open
@@ -34,6 +41,28 @@ const AuditLog = (props: any) => {
   // Only render for games that actually keep a log (UU), and not in the lobby.
   if (!G || !Array.isArray(G.auditLog)) return null;
   if (props.ctx && props.ctx.phase === 'pregame') return null;
+
+  const previewCard = previewID != null ? deck[previewID] : undefined;
+
+  // Renders an entry's text with its card name as a hover target.
+  const renderText = (e: LogEntry) => {
+    if (e.cardID == null || !e.cardTitle || !e.text.includes(e.cardTitle)) {
+      return highlightNames(e.text, names);
+    }
+    const [before, after] = e.text.split(e.cardTitle);
+    return (
+      <>
+        {highlightNames(before, names)}
+        <CardName
+          onMouseEnter={() => setPreviewID(e.cardID)}
+          onMouseLeave={() => setPreviewID(undefined)}
+        >
+          {e.cardTitle}
+        </CardName>
+        {highlightNames(after || '', names)}
+      </>
+    );
+  };
 
   let lastRound = -1;
 
@@ -64,13 +93,24 @@ const AuditLog = (props: any) => {
                   {showDivider && <RoundDivider>Round {e.round}</RoundDivider>}
                   <Row>
                     <Who>{highlightNames(e.playerName, names)}</Who>{' '}
-                    <What>{highlightNames(e.text, names)}</What>
+                    <What>{renderText(e)}</What>
                   </Row>
                 </div>
               );
             })}
           </List>
         </Panel>
+      )}
+
+      {open && previewCard && (
+        <Preview>
+          <PreviewImg
+            src={ImageLoader.load(previewCard.image)}
+            alt={previewCard.title}
+            style={{ borderColor: _typeToColor(previewCard.type) }}
+          />
+          <PreviewTitle>{previewCard.title}</PreviewTitle>
+        </Preview>
       )}
     </>,
     document.body
@@ -87,6 +127,45 @@ const Dock = styled.div`
   gap: 6px;
   align-items: flex-start;
   font-family: ${FONT_DISPLAY};
+`;
+
+const CardName = styled.span`
+  font-weight: 700;
+  color: #a5f3fc;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: help;
+  white-space: nowrap;
+`;
+
+const Preview = styled.div`
+  position: fixed;
+  top: max(48px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 12000;
+  width: min(240px, 40vw);
+  padding: 10px;
+  border-radius: 16px;
+  background: #1b1030;
+  border: 1px solid ${COLORS.panelBorder};
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  font-family: ${FONT_DISPLAY};
+`;
+
+const PreviewImg = styled.img`
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+  border: 3px solid #fff;
+`;
+
+const PreviewTitle = styled.div`
+  margin-top: 8px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 11pt;
+  color: #fff;
 `;
 
 const RoundChip = styled.div`
