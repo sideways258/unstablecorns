@@ -1,10 +1,12 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { FONT_DISPLAY, COLORS } from '../theme';
 import { highlightNames } from './highlightNames';
 import ImageLoader from '../assets/card/imageLoader';
 import { _typeToColor } from './util';
+import { cardDescription } from '../BoardUtil';
+import { LanguageContext } from '../LanguageContextProvider';
 
 export type LogEntry = {
   id: string;
@@ -26,6 +28,7 @@ const AuditLog = (props: any) => {
   const names: string[] = G && Array.isArray(G.players) ? G.players.map((p: any) => p.name) : [];
 
   const deck: any[] = G && Array.isArray(G.deck) ? G.deck : [];
+  const language = useContext(LanguageContext);
 
   const [open, setOpen] = useState(false);
   const [previewID, setPreviewID] = useState<number | undefined>(undefined);
@@ -110,6 +113,9 @@ const AuditLog = (props: any) => {
             style={{ borderColor: _typeToColor(previewCard.type) }}
           />
           <PreviewTitle>{previewCard.title}</PreviewTitle>
+          <PreviewDesc>
+            {cardDescription(previewCard, language ? language.language : 'en')}
+          </PreviewDesc>
         </Preview>
       )}
     </>,
@@ -143,7 +149,9 @@ const Preview = styled.div`
   top: max(48px, env(safe-area-inset-top));
   left: max(16px, env(safe-area-inset-left));
   z-index: 12000;
-  width: min(240px, 40vw);
+  width: min(260px, 42vw);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
   padding: 10px;
   border-radius: 16px;
   background: #1b1030;
@@ -166,6 +174,15 @@ const PreviewTitle = styled.div`
   font-weight: 700;
   font-size: 11pt;
   color: #fff;
+`;
+
+const PreviewDesc = styled.div`
+  margin-top: 6px;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+  word-break: break-word;
 `;
 
 const RoundChip = styled.div`
