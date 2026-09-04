@@ -960,15 +960,16 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
 
 const renderTop = (G: UnstableUnicornsGame, ctx: Ctx, isCurrentPlayer: boolean, boardStates: BoardState[]) => {
     if (isCurrentPlayer) {
-        let text: string = "It's your turn";
+        // "whose turn" is already shown by <TurnIndicator>; only surface the
+        // extra neigh-wait message here so we don't stack two "your turn" pills.
         if (boardStates.find(s => s.type === "neigh__wait")) {
-            text = "It's neigh time! Other players may neigh your card. Waiting for others..."
+            return (
+                <div style={{ display: "flex", alignItems: "center" }}>
+                    <GameLabel text="It's neigh time! Other players may neigh your card. Waiting for others..." />
+                </div>
+            );
         }
-        return (
-            <div style={{ display: "flex", alignItems: "center" }}>
-                <GameLabel text={text} />
-            </div>
-        );
+        return undefined;
     } else {
         return (
             <HiddenHand
