@@ -303,8 +303,12 @@ const Board = (props: any) => {
 
     // Actions the player has started (aiming an arrow, or a card effect waiting
     // for a target) that they can back out of.
+    // Committed ("you may..." popups the player already opted into, e.g.
+    // "Discard 2 cards") are cancellable too now: skipExecuteDo fully undoes the
+    // commit as long as nothing in the scene has actually executed yet, so
+    // there's no reason to hide the Cancel button once a scene is committed.
     const cancellableStates = boardStates.filter(
-        (b: BoardState) => (b as any).info?.instructionID && !String(b.type).includes("committed") && b.type !== "neigh__wait"
+        (b: BoardState) => (b as any).info?.instructionID && b.type !== "neigh__wait"
     );
     const canCancelAction = cardInteraction !== undefined || cancellableStates.length > 0;
     const handleCancelAction = () => {

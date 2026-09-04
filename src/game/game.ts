@@ -90,6 +90,12 @@ export interface Scene {
     actions: Action[];
     mandatory: boolean;
     endTurnImmediately: boolean;
+    /** true once the player has explicitly opted into an optional "you may..."
+     *  scene via the commit move (e.g. clicking "Discard 2 cards"). Lets Cancel
+     *  fully undo that choice - as opposed to a scene that was mandatory from
+     *  the moment it was created (a forced effect), which Cancel must never be
+     *  able to uncommit. */
+    playerCommitted?: boolean;
 }
 
 export interface Action {
@@ -845,7 +851,9 @@ function end(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
 }
 
 function commit(G: UnstableUnicornsGame, ctx: Ctx, sceneID: string) {
-    G.script.scenes.find(sc => sc.id === sceneID)!.mandatory = true;
+    const scene = G.script.scenes.find(sc => sc.id === sceneID)!;
+    scene.mandatory = true;
+    scene.playerCommitted = true;
     // e.g. "Discard 2 cards" committed with an empty hand: settle it immediately
     // instead of leaving the player stuck with nothing to click on.
     _settleUnfulfillableDiscards(G, ctx);
@@ -890,6 +898,16 @@ function skipExecuteDo(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID,
             .filter(ins => ins.protagonist === protagonist && ins.state !== "executed")
             .forEach(ins => { ins.state = "open"; });
     });
+
+    // If the player voluntarily opted into this "you may..." scene (clicked
+    // e.g. "Discard 2 cards") but hasn't actually done anything yet, cancelling
+    // fully un-commits it too - back to a plain offer they can ignore (draw /
+    // end turn) or activate again. A scene that was mandatory from the moment
+    // it was created (a forced effect, never opted into) is never touched here,
+    // so Cancel can't be used to dodge a genuinely required action.
+    if (!anyExecuted && scene.playerCommitted === true) {
+        scene.mandatory = false;
+    }
 }
 
 //

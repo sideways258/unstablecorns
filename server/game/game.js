@@ -701,7 +701,9 @@ function end(G, ctx, protagonist) {
     }
 }
 function commit(G, ctx, sceneID) {
-    G.script.scenes.find(function (sc) { return sc.id === sceneID; }).mandatory = true;
+    var scene = G.script.scenes.find(function (sc) { return sc.id === sceneID; });
+    scene.mandatory = true;
+    scene.playerCommitted = true;
     // e.g. "Discard 2 cards" committed with an empty hand: settle it immediately
     // instead of leaving the player stuck with nothing to click on.
     do_1._settleUnfulfillableDiscards(G, ctx);
@@ -742,6 +744,14 @@ function skipExecuteDo(G, ctx, protagonist, instructionID) {
             .filter(function (ins) { return ins.protagonist === protagonist && ins.state !== "executed"; })
             .forEach(function (ins) { ins.state = "open"; });
     });
+    // If the player voluntarily opted into this "you may..." scene (clicked
+    // e.g. "Discard 2 cards") but hasn't actually done anything yet, cancelling
+    // fully un-commits it too. A scene that was mandatory from the moment it was
+    // created (a forced effect, never opted into) is never touched here, so
+    // Cancel can't be used to dodge a genuinely required action.
+    if (!anyExecuted && scene.playerCommitted === true) {
+        scene.mandatory = false;
+    }
 }
 //
 function setUIHoverHandIndex(G, ctx, index) {
