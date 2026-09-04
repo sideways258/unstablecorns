@@ -19,6 +19,9 @@ type Props = {
     upgradeDowngradeStable: { [key: string]: Card[] };
     currentPlayer: PlayerID;
     handCount: number[];
+    /** Hands that are face-up to everyone (e.g. a player with "Glass Walls").
+     *  Keyed by player id. */
+    revealedHands?: { [key: string]: Card[] };
     onStableCardClick: (cardID: CardID) => void;
     onStableCardMouseEnter: (cardID: CardID) => void;
     onStableCardMouseLeave: (cardID: CardID) => void;
@@ -114,6 +117,27 @@ const PlayerField = React.forwardRef<PlayerFieldHandle, Props>((props, ref) => {
                                 }
                             </Stable>
                         </InnerBox>
+                        {props.revealedHands && props.revealedHands[pl.id] &&
+                            <RevealedHand onClick={(e) => e.stopPropagation()}>
+                                <RevealedTag>👁 hand</RevealedTag>
+                                {props.revealedHands[pl.id].length === 0 &&
+                                    <RevealedEmpty>empty</RevealedEmpty>
+                                }
+                                {props.revealedHands[pl.id].map((c, i) => (
+                                    <div
+                                        key={`${c.id}-${i}`}
+                                        style={{ position: "relative" }}
+                                        onMouseEnter={() => setShowHover(c.id)}
+                                        onMouseLeave={() => setShowHover(undefined)}
+                                    >
+                                        <RevealedCard image={ImageLoader.load(c.image)} color={_typeToColor(c.type)} />
+                                        {showHover === c.id &&
+                                            <CardHover title={c.title} position={"top"} offset={{ x: 40, y: 0 }} color={_typeToColor(c.type)} text={cardDescription(c, context!.language)} />
+                                        }
+                                    </div>
+                                ))}
+                            </RevealedHand>
+                        }
                     </PlayerBox>
                 );
             })}
@@ -133,6 +157,7 @@ const currentGlow = keyframes`
 `;
 
 const PlayerBox = styled.div<{ current: boolean }>`
+    position: relative;
     width: 148px;
     height: 176px;
     background-color: ${props => props.current ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0)"};
@@ -140,6 +165,50 @@ const PlayerBox = styled.div<{ current: boolean }>`
     margin: 0.35em;
     padding: 5px;
     animation: ${props => props.current ? css`${currentGlow} 2s ease-in-out infinite` : 'none'};
+`;
+
+const RevealedHand = styled.div`
+    position: absolute;
+    top: calc(100% - 2px);
+    left: -2px;
+    right: -2px;
+    z-index: 40;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(10, 6, 20, 0.92);
+    border: 2px solid #8b5cf6;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+`;
+
+const RevealedTag = styled.div`
+    width: 100%;
+    text-align: center;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #c4b5fd;
+`;
+
+const RevealedEmpty = styled.div`
+    font-size: 9px;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 2px 0;
+`;
+
+const RevealedCard = styled.div<{ image: string; color: string }>`
+    width: 22px;
+    height: 30px;
+    background-image: url(${props => props.image});
+    background-size: cover;
+    border-radius: 3px;
+    border: 1.5px solid ${props => props.color};
 `;
 
 const InnerBox = styled.div`

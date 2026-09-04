@@ -55,6 +55,25 @@ export interface UnstableUnicornsGame extends Game {
         id: string,
     } | undefined;
     lastNeighResult: {id: string, result: "cardWasPlayed" | "cardWasNeighed"} | undefined;
+    /** Round counter. A round is one full cycle of turns (every active player has
+     *  played once). Starts at 1 in the main phase. */
+    round: number;
+    /** seats that have already taken a turn this round - internal, drives `round`
+     *  (immune to bonus turns and to players leaving mid-round). */
+    roundSeats: PlayerID[];
+    /** Shared, append-only history of what each player did (card plays, neighs,
+     *  draws, ...), shown to everyone in the audit-log window. */
+    auditLog: AuditEntry[];
+}
+
+export interface AuditEntry {
+    id: string;
+    round: number;
+    turn: number;
+    playerID: PlayerID;
+    playerName: string;
+    text: string;
+    ts: number;
 }
 
 interface Script {
@@ -175,6 +194,9 @@ const UnstableUnicorns = {
             uiExecuteDo: undefined,
             uiCardToCard: undefined,
             lastNeighResult: undefined,
+            round: 1,
+            roundSeats: [],
+            auditLog: [],
         };
     },
     phases: {
@@ -274,6 +296,22 @@ const UnstableUnicorns = {
                 (Date.now() - G.turnTimer.turnStartedAt) > 180000) {
                 G.turnTimer.unlocked = true;
             }
+
+            // Round counting: a round is complete once every active player has
+            // taken a turn. Tracking distinct seats makes it immune to bonus
+            // turns (Change of Luck) and to a player leaving mid-round.
+            if (ctx.phase === "main") {
+                if (G.round === undefined) { G.round = 1; }
+                if (!Array.isArray(G.roundSeats)) { G.roundSeats = []; }
+                if (G.roundSeats.indexOf(ctx.currentPlayer) === -1) {
+                    G.roundSeats = [...G.roundSeats, ctx.currentPlayer];
+                }
+                const activeIds = _activePlayers(G).map(p => p.id);
+                if (activeIds.length > 0 && activeIds.every(id => G.roundSeats.indexOf(id) !== -1)) {
+                    G.round = G.round + 1;
+                    G.roundSeats = [];
+                }
+            }
         },
         stages: {
             pregame: {
@@ -344,6 +382,34 @@ export function _activePlayers(G: UnstableUnicornsGame): Player[] {
     return G.players.filter(p => (G.leftPlayers || []).indexOf(p.id) === -1);
 }
 
+// Append an entry to the shared audit log (what each player did).
+function _log(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, text: string) {
+    if (!G.auditLog) { G.auditLog = []; }
+    const pl = G.players.find(p => p.id === String(playerID));
+    G.auditLog.push({
+        id: _.uniqueId("log_"),
+        round: G.round || 1,
+        turn: ctx.turn,
+        playerID: String(playerID),
+        playerName: (pl && pl.name) || `Player ${playerID}`,
+        text,
+        ts: Date.now(),
+    });
+    if (G.auditLog.length > 250) {
+        G.auditLog = G.auditLog.slice(-250);
+    }
+}
+
+function _cardTitle(G: UnstableUnicornsGame, cardID: CardID): string {
+    const c = G.deck[cardID];
+    return (c && c.title) || "a card";
+}
+
+function _playerName(G: UnstableUnicornsGame, playerID: PlayerID): string {
+    const pl = G.players.find(p => p.id === String(playerID));
+    return (pl && pl.name) || `Player ${playerID}`;
+}
+
 // Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all
 // count). A card counts twice if it has the "count_as_two" passive OR it granted
 // the player a "count_as_two" effect on entering (e.g. Ginormous Unicorn).
@@ -393,6 +459,7 @@ function playerLeft(G: UnstableUnicornsGame, ctx: Ctx, leaverID?: PlayerID) {
     }
 
     G.leftPlayers = [...G.leftPlayers, pid];
+    _log(G, ctx, pid, "left the game");
 
     // 1. Their cards leave play. Baby unicorns go back to the Nursery (their
     //    printed rule), everything else to the discard pile.
@@ -538,6 +605,7 @@ function forceEndTurnOnTimeout(G: UnstableUnicornsGame, ctx: Ctx) {
     G.uiCardToCard = undefined;
     G.uiExecuteDo = undefined;
     G.mustEndTurnImmediately = false;
+    _log(G, ctx, pid, "ran out of time - turn ended");
 
     ctx.events?.endTurn!();
 }
@@ -569,6 +637,7 @@ export function canPlayCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: Play
 function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, cardID: CardID) {
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
+    _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`);
 
     if (G.playerEffects[protagonist].findIndex(f => f.effect.key === "your_cards_cannot_be_neighed") > -1) {
         enter(G, ctx, { playerID: protagonist, cardID });
@@ -587,6 +656,9 @@ function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, card
 function playUpgradeDowngradeCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, targetPlayer: PlayerID, cardID: CardID) {
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
+    _log(G, ctx, protagonist, String(targetPlayer) === String(protagonist)
+        ? `played ${_cardTitle(G, cardID)} on themselves`
+        : `played ${_cardTitle(G, cardID)} on ${_playerName(G, targetPlayer)}`);
 
     if (G.playerEffects[protagonist].findIndex(f => f.effect.key === "your_cards_cannot_be_neighed") > -1) {
         enter(G, ctx, { playerID: targetPlayer, cardID });
@@ -606,6 +678,7 @@ function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonis
     if (G.neighDiscussion) {
         G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
         G.discardPile = [...G.discardPile, cardID];
+        _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`);
 
         const round = G.neighDiscussion.rounds[roundIndex];
         // check if there was already a neigh vote during this round
@@ -628,6 +701,7 @@ function playSuperNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, prota
     if (G.neighDiscussion) {
         G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
         G.discardPile = [...G.discardPile, cardID];
+        _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`);
 
         const round = G.neighDiscussion.rounds[roundIndex];
         // check if there was already a neigh vote during this round
@@ -704,6 +778,7 @@ function drawAndEnd(G: UnstableUnicornsGame, ctx: Ctx) {
     G.hand[ctx.currentPlayer].push(_.first(G.drawPile)!);
     G.drawPile = _.rest(G.drawPile, 1);
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
+    _log(G, ctx, ctx.currentPlayer, "drew a card");
 }
 
 function end(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
@@ -769,10 +844,27 @@ function commit(G: UnstableUnicornsGame, ctx: Ctx, sceneID: string) {
 }
 
 function skipExecuteDo(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, instructionID: string) {
-    if (_findInstructionWithID(G, instructionID) !== null) {
-        const [scene, action, instruction] = _findInstructionWithID(G, instructionID)!;
-        console.log("cc")
-        action.instructions.filter((ins) => ins.protagonist === protagonist).forEach((ins) => ins.state = "executed");
+    const found = _findInstructionWithID(G, instructionID);
+    if (found === null) {
+        return;
+    }
+    const [scene, action] = found;
+
+    if (scene.mandatory === false) {
+        // Cancelling an optional "you may X, then Y" scene puts it back to
+        // "not started": every step that has not actually run yet returns to
+        // "open", so the player can still activate it later (cost step first).
+        // Nothing is marked executed, so a later step can never unlock by
+        // skipping an earlier one.
+        scene.actions.forEach(ac => {
+            ac.instructions
+                .filter(ins => ins.protagonist === protagonist && ins.state !== "executed")
+                .forEach(ins => { ins.state = "open"; });
+        });
+    } else {
+        action.instructions
+            .filter(ins => ins.protagonist === protagonist)
+            .forEach(ins => { ins.state = "executed"; });
     }
 }
 

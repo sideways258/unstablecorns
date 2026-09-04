@@ -8,6 +8,7 @@ import BackButton from './ui/BackButton';
 import PlayerPresence from './ui/PlayerPresence';
 import SettingsMenu from './ui/SettingsMenu';
 import TurnTimer from './ui/TurnTimer';
+import AuditLog from './ui/AuditLog';
 
 type RouteParam = {
     gameId?: string;
@@ -59,6 +60,7 @@ const GameClient = ({ debug }: Props) => {
                         }
                     />
                     <TurnTimer {...boardProps} />
+                    <AuditLog {...boardProps} />
                     <PlayerPresence {...boardProps} />
                 </>
             );

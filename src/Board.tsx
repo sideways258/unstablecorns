@@ -14,7 +14,7 @@ import UpgradeDowngradeStable from './ui/UpgradeDowngradeStable';
 import DrawPile from './ui/DrawPile';
 import Nursery from './ui/Nursery';
 import DiscardPile from './ui/DiscardPile';
-import { CardID } from './game/card';
+import { Card, CardID } from './game/card';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { findUITargets, HoverTarget } from './BoardUtil';
 import RainbowArrow from './ui/RainbowArrow';
@@ -236,6 +236,16 @@ const Board = (props: any) => {
     const stableHighlightMode = hoverTargets?.targets.filter(s => s.type === "stable_card").map(s => s.info.cardID).concat([hoverTargets.sourceCardID]);
 
     const boardStates = getBoardState(G, ctx, playerID);
+
+    // Hands that "Glass Walls" (your_hand_is_visible) has turned face-up for
+    // everyone - shown permanently under that player's field, no clicking needed.
+    const revealedHands: { [key: string]: Card[] } = {};
+    G.players.forEach(p => {
+        if ((G.playerEffects[p.id] || []).some((e: any) => e.effect && e.effect.key === "your_hand_is_visible")) {
+            revealedHands[p.id] = (G.hand[p.id] || []).map(c => G.deck[c]);
+        }
+    });
+
     if (boardStates.find(s => s.type === "destroy__click_on_card_in_stable" || s.type === "sacrifice__clickOnCardInStable")) {
         const boardState = boardStates.find(s => s.type === "destroy__click_on_card_in_stable" || s.type === "sacrifice__clickOnCardInStable")!;
         // only update if the card interaction is different 
@@ -516,6 +526,7 @@ const Board = (props: any) => {
                         currentPlayer={ctx.currentPlayer}
                         stable={_.mapObject(_.mapObject(G.stable, (val, key) => [...val, ...G.temporaryStable[key]]), c => c.map(d => G.deck[d]))}
                         handCount={G.players.map(pl => G.hand[pl.id].length)}
+                        revealedHands={revealedHands}
                         upgradeDowngradeStable={_.mapObject(G.upgradeDowngradeStable, c => c.map(d => G.deck[d]))}
                         highlightMode={stableHighlightMode}
                         onHandClick={playerID => setShowPlayerHand(playerID)}
