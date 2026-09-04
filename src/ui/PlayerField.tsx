@@ -41,6 +41,10 @@ const PlayerField = React.forwardRef<PlayerFieldHandle, Props>((props, ref) => {
     });
     const context = useContext(LanguageContext)
 
+    // Only reserve headroom above the row when a hand is actually being shown
+    // (Glass Walls in play) - the normal layout is untouched otherwise.
+    const hasRevealedHand = !!props.revealedHands && Object.keys(props.revealedHands).length > 0;
+
     useImperativeHandle(ref, () => ({
         getStableItemRef: (cardID: CardID) => {
             return getItemRefs(`${cardID}`) as any;
@@ -48,7 +52,7 @@ const PlayerField = React.forwardRef<PlayerFieldHandle, Props>((props, ref) => {
     }));
 
     return (
-        <Wrapper>
+        <Wrapper $hasRevealedHand={hasRevealedHand}>
             {props.players.map((pl, idx) => {
                 return (
                     <PlayerBox key={pl.id} current={pl.id === props.currentPlayer}>
@@ -118,7 +122,13 @@ const PlayerField = React.forwardRef<PlayerFieldHandle, Props>((props, ref) => {
                             </Stable>
                         </InnerBox>
                         {props.revealedHands && props.revealedHands[pl.id] &&
-                            <RevealedHand onClick={(e) => e.stopPropagation()}>
+                            <RevealedHand
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    props.onHandClick(pl.id);
+                                }}
+                                title="Tap to see this hand"
+                            >
                                 <RevealedTag>👁 hand</RevealedTag>
                                 {props.revealedHands[pl.id].length === 0 &&
                                     <RevealedEmpty>empty</RevealedEmpty>
@@ -145,10 +155,15 @@ const PlayerField = React.forwardRef<PlayerFieldHandle, Props>((props, ref) => {
     );
 });
 
-const Wrapper = styled.div`
+const Wrapper = styled.div<{ $hasRevealedHand: boolean }>`
     display: flex;
     align-items: center;
     justify-content: center;
+    /* headroom for a revealed hand (Glass Walls) to sit above a player's box
+       instead of hanging below it and overlapping the current player's own
+       stable / hand area - only reserved while a hand is actually shown */
+    padding-top: ${props => (props.$hasRevealedHand ? '64px' : '0')};
+    transition: padding-top 0.15s ease;
 `;
 
 const currentGlow = keyframes`
@@ -169,7 +184,7 @@ const PlayerBox = styled.div<{ current: boolean }>`
 
 const RevealedHand = styled.div`
     position: absolute;
-    top: calc(100% - 2px);
+    bottom: calc(100% + 4px);
     left: -2px;
     right: -2px;
     z-index: 40;
@@ -183,6 +198,13 @@ const RevealedHand = styled.div`
     background: rgba(10, 6, 20, 0.92);
     border: 2px solid #8b5cf6;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+
+    &:hover {
+        transform: translateY(-2px);
+        border-color: #c4b5fd;
+    }
 `;
 
 const RevealedTag = styled.div`

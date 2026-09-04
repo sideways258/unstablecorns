@@ -18,7 +18,17 @@ export function getBoardState(G: UnstableUnicornsGame, ctx: Ctx, playerID: Playe
         if (ctx.currentPlayer === playerID) {
             // player must end a mandatory scene before it may draw
             if (inProgressScenes.length > 0) {
-                return [...getExecutionDoState(G, ctx, playerID, inProgressScenes)];
+                // Also surface any OTHER not-yet-committed card offers (e.g. a
+                // second upgrade with its own "you may..." effect), so several
+                // begin-of-turn cards can be resolved in any order - you just
+                // have to finish whichever one you've committed to before you
+                // can draw to start your actual turn.
+                const inProgressSceneIds = new Set(inProgressScenes.map(([, sc]) => sc.id));
+                const otherOpenScenes = openScenes.filter(([, sc]) => !inProgressSceneIds.has(sc.id));
+                return [
+                    ...getExecutionDoState(G, ctx, playerID, inProgressScenes),
+                    ...getExecutionDoState(G, ctx, playerID, otherOpenScenes),
+                ];
             }
 
             if (openScenes.length > 0) {

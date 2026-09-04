@@ -1074,11 +1074,13 @@ const renderInfoLabel = (G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, 
     const scenesInProgress = _findInProgressScenesWithProtagonist(G, playerID);
 
     if (ctx.currentPlayer === playerID && ctx.activePlayers![playerID] === "beginning" && openScenes.length > 0) {
-        text = "One of your cards has an effect that can be activated. You can activate it and after that draw a card. You may also skip the effect and just draw a card."
+        text = openScenes.length > 1
+            ? "Some of your cards have effects that can be activated - hover a card to activate it, in any order you like. Once you're done (or skip them), draw a card to start your turn."
+            : "One of your cards has an effect that can be activated. You can activate it and after that draw a card to start your turn. You may also skip the effect and just draw a card."
     }
 
     if (ctx.currentPlayer === playerID && ctx.activePlayers![playerID] === "beginning" && scenesInProgress.length > 0) {
-        text = "One of your cards has an effect that must be activated. You must first activate it before you can draw a card."
+        text = "One of your cards has an effect you've started - finish it (other cards' effects are still available too) before you can draw to start your turn."
     }
 
     if (playerID === ctx.currentPlayer) {
