@@ -99,7 +99,18 @@ function enter(G, ctx, param) {
                 }
             }
         }
+        var sceneCountBefore = G.script.scenes.length;
         game_1._addSceneFromDo(G, ctx, param.cardID, param.playerID, "enter");
+        // Link the scene this Magic card just created back to its "played
+        // <Card>" audit-log entry, so executeDo() can append who it hit.
+        if (card.type === "magic" && G.clipboard && G.clipboard.pendingCardLog &&
+            G.clipboard.pendingCardLog[param.cardID] !== undefined) {
+            if (G.script.scenes.length > sceneCountBefore) {
+                G.script.scenes[G.script.scenes.length - 1].auditLogEntryId =
+                    G.clipboard.pendingCardLog[param.cardID];
+            }
+            delete G.clipboard.pendingCardLog[param.cardID];
+        }
         cardOnEnter.filter(function (on) { return on["do"].type === "auto"; }).forEach(function (on) {
             if (on["do"].type === "auto" && on["do"].info.key === "sacrifice_all_downgrades") {
                 var toBeRemoved = underscore_1["default"].filter(G.upgradeDowngradeStable[param.playerID], function (c) {
@@ -231,6 +242,31 @@ function canEnter(G, ctx, param) {
     return true;
 }
 exports.canEnter = canEnter;
+// For a step that affects another player's card/hand, figures out who that
+// player is - resolved BEFORE the step runs, since some of these (steal,
+// destroy) change or remove the card's ownership as a side effect.
+function _resolveTargetPlayerForLog(G, key, param) {
+    switch (key) {
+        case "steal":
+        case "destroy":
+        case "sacrifice":
+        case "returnToHand":
+        case "move":
+        case "backKick":
+            return param && param.cardID !== undefined ? (findOwnerOfCard(G, param.cardID) || undefined) : undefined;
+        case "pull":
+        case "blatantThievery1":
+            return param ? param.from : undefined;
+        case "pullRandom":
+        case "swapHands":
+        case "unicornSwap2":
+        case "move2":
+        case "makeSomeoneDiscard":
+            return param ? param.playerID : undefined;
+        default:
+            return undefined;
+    }
+}
 function executeDo(G, ctx, instructionID, param) {
     var _a;
     var _b = exports._findInstructionWithID(G, instructionID), scene = _b[0], action = _b[1], instruction = _b[2];
@@ -238,6 +274,15 @@ function executeDo(G, ctx, instructionID, param) {
         G.mustEndTurnImmediately = true;
     }
     instruction.state = "in_progress";
+    // A Magic card's target is only known once its effect actually resolves
+    // against someone - record it on the "played <Card>" log line the first
+    // time that happens.
+    if (scene.auditLogEntryId) {
+        var targetPlayer = _resolveTargetPlayerForLog(G, instruction["do"].key, param);
+        if (targetPlayer !== undefined && String(targetPlayer) !== String(param.protagonist)) {
+            game_1._recordCardTarget(G, scene.auditLogEntryId, targetPlayer);
+        }
+    }
     // ui sound
     G.uiExecuteDo = { id: underscore_1["default"].uniqueId(), cardID: (_a = instruction.ui.info) === null || _a === void 0 ? void 0 : _a.source, "do": instruction["do"] };
     // execute instruction

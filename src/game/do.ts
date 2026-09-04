@@ -1,5 +1,5 @@
 import { Card, CardID, isUnicorn, OnEnter, OnEnterAddEffect, OnEnterAddScene } from "./card";
-import { UnstableUnicornsGame, Ctx, Scene, Instruction, Action, _addSceneFromDo } from "./game";
+import { UnstableUnicornsGame, Ctx, Scene, Instruction, Action, _addSceneFromDo, _recordCardTarget } from "./game";
 import type { PlayerID } from "./player";
 import _ from 'underscore';
 import { CONSTANTS } from "./constants";
@@ -97,7 +97,20 @@ export function enter(G: UnstableUnicornsGame, ctx: Ctx, param: ParamEnter) {
             }
         }
 
+        const sceneCountBefore = G.script.scenes.length;
         _addSceneFromDo(G, ctx, param.cardID, param.playerID, "enter");
+
+        // Link the scene this Magic card just created back to its "played
+        // <Card>" audit-log entry, so once the scene's effect actually
+        // resolves against a target, executeDo() can append who it hit.
+        if (card.type === "magic" && G.clipboard && G.clipboard.pendingCardLog &&
+            G.clipboard.pendingCardLog[param.cardID] !== undefined) {
+            if (G.script.scenes.length > sceneCountBefore) {
+                G.script.scenes[G.script.scenes.length - 1].auditLogEntryId =
+                    G.clipboard.pendingCardLog[param.cardID];
+            }
+            delete G.clipboard.pendingCardLog[param.cardID];
+        }
 
         cardOnEnter.filter(on => on.do.type === "auto").forEach(on => {
             if (on.do.type === "auto" && on.do.info.key === "sacrifice_all_downgrades") {
@@ -250,6 +263,33 @@ export function canEnter(G: UnstableUnicornsGame, ctx: Ctx, param: ParamEnter) {
 
 export type Do = DoSteal | DoPull | DoPullRandom | DoDiscard | DoDestroy | DoSacrifice | DoSearch | DoRevive | DoDraw | DoAddFromDiscardPileToHand | DoReviveFromNursery | DoReturnToHand | DoBringToStable | /*DoPeekAddReorder |*/ DoMakeSomeoneDiscard | DoSwapHands | DoShakeUp | DoReset | DoMove | DoMove2 | DoBackKick | DoShuffleDiscardPileIntoDrawPile | DoUnicornSwap1 | DoUnicornSwap2 |DoBlatantThievery1 ;
 
+// For a step that affects another player's card/hand, figures out who that
+// player is - resolved BEFORE the step runs, since some of these (steal,
+// destroy) change or remove the card's ownership as a side effect, which
+// would make it unfindable afterwards.
+function _resolveTargetPlayerForLog(G: UnstableUnicornsGame, key: string, param: any): PlayerID | undefined {
+    switch (key) {
+        case "steal":
+        case "destroy":
+        case "sacrifice":
+        case "returnToHand":
+        case "move":
+        case "backKick":
+            return param && param.cardID !== undefined ? (findOwnerOfCard(G, param.cardID) ?? undefined) : undefined;
+        case "pull":
+        case "blatantThievery1":
+            return param ? param.from : undefined;
+        case "pullRandom":
+        case "swapHands":
+        case "unicornSwap2":
+        case "move2":
+        case "makeSomeoneDiscard":
+            return param ? param.playerID : undefined;
+        default:
+            return undefined;
+    }
+}
+
 export function executeDo(G: UnstableUnicornsGame, ctx: Ctx, instructionID: string, param: { protagonist: PlayerID }) {
     const [scene, action, instruction] = _findInstructionWithID(G, instructionID)!;
 
@@ -258,6 +298,16 @@ export function executeDo(G: UnstableUnicornsGame, ctx: Ctx, instructionID: stri
     }
 
     instruction.state = "in_progress";
+
+    // A Magic card's target is only known once its effect actually resolves
+    // against someone - record it on the "played <Card>" log line the first
+    // time that happens (see playCard() / enter() for how the two get linked).
+    if (scene.auditLogEntryId) {
+        const targetPlayer = _resolveTargetPlayerForLog(G, instruction.do.key, param as any);
+        if (targetPlayer !== undefined && String(targetPlayer) !== String((param as any).protagonist)) {
+            _recordCardTarget(G, scene.auditLogEntryId, targetPlayer);
+        }
+    }
 
     // ui sound
     G.uiExecuteDo = { id: _.uniqueId(), cardID: instruction.ui.info?.source, do: instruction.do };

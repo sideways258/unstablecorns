@@ -34,14 +34,13 @@ export interface UnstableUnicornsGame extends Game {
     /** Seats whose player has left the game. They are skipped in the turn
      *  order, hold no cards, and owe no actions. */
     leftPlayers: PlayerID[];
-    /** Optional host-run turn timer. Can only be switched on once a turn has
-     *  actually run over 3 minutes (`unlocked`). When `enabled`, a turn that
-     *  runs past `durationSec` (60-300) is force-ended. */
+    /** Optional host-run turn timer, toggled on/off directly (the clock button
+     *  on the board). When `enabled`, a turn that runs past `durationSec`
+     *  (60-300) is force-ended. */
     turnTimer: {
         enabled: boolean;
         durationSec: number;
         turnStartedAt: number | undefined;
-        unlocked: boolean;
     };
     babyStarter: { cardID: CardID, owner: PlayerID }[];
     ready: { [key: string]: boolean };
@@ -76,6 +75,8 @@ export interface AuditEntry {
     /** the card this entry is about (for the hover preview in the log window) */
     cardID?: CardID;
     cardTitle?: string;
+    /** who a played upgrade/downgrade/magic card ended up targeting, if anyone */
+    targetPlayerID?: PlayerID;
     ts: number;
 }
 
@@ -96,6 +97,10 @@ export interface Scene {
      *  the moment it was created (a forced effect), which Cancel must never be
      *  able to uncommit. */
     playerCommitted?: boolean;
+    /** links this scene back to the "played <Card>" audit-log entry that
+     *  created it, so a Magic card's eventual target (only known once its
+     *  effect actually resolves) can be appended to that same log line. */
+    auditLogEntryId?: string;
 }
 
 export interface Action {
@@ -196,7 +201,7 @@ const UnstableUnicorns = {
             endGame: false,
             expansions: [],
             leftPlayers: [],
-            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false },
+            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined },
             babyStarter: [],
             ready,
             uiHoverHandIndex: undefined,
@@ -225,6 +230,11 @@ const UnstableUnicorns = {
     turn: {
         // Skip any seat whose player has left the game.
         order: {
+            // Randomize who goes in which order each game. This only shuffles
+            // the TURN sequence - the host is still whoever sits in seat "0"
+            // (isHost checks are keyed on that, not on turn order), so the
+            // host keeps host controls no matter where they land in the order.
+            playOrder: (G: UnstableUnicornsGame, ctx: Ctx) => _.shuffle(G.players.map(p => p.id)),
             first: (G: UnstableUnicornsGame, ctx: Ctx) => {
                 for (let pos = 0; pos < ctx.numPlayers; pos++) {
                     if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
@@ -251,7 +261,7 @@ const UnstableUnicorns = {
 
             // stamp when this turn started so the (optional) turn timer can run
             if (!G.turnTimer) {
-                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
             }
             G.turnTimer.turnStartedAt = Date.now();
 
@@ -299,13 +309,6 @@ const UnstableUnicorns = {
             }
         },
         onEnd: (G: UnstableUnicornsGame, ctx: Ctx) => {
-            // Once any turn actually runs over 3 minutes, the host is allowed to
-            // switch the turn timer on.
-            if (G.turnTimer && G.turnTimer.turnStartedAt &&
-                (Date.now() - G.turnTimer.turnStartedAt) > 180000) {
-                G.turnTimer.unlocked = true;
-            }
-
             // Round counting: a round is complete once every active player has
             // taken a turn. Tracking distinct seats makes it immune to bonus
             // turns (Change of Luck) and to a player leaving mid-round.
@@ -391,11 +394,12 @@ export function _activePlayers(G: UnstableUnicornsGame): Player[] {
     return G.players.filter(p => (G.leftPlayers || []).indexOf(p.id) === -1);
 }
 
-// Append an entry to the shared audit log (what each player did).
-function _log(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, text: string, cardID?: CardID) {
+// Append an entry to the shared audit log (what each player did). Returns the
+// entry so the caller can hold onto its id (see _recordCardTarget).
+function _log(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, text: string, cardID?: CardID): AuditEntry {
     if (!G.auditLog) { G.auditLog = []; }
     const pl = G.players.find(p => p.id === String(playerID));
-    G.auditLog.push({
+    const entry: AuditEntry = {
         id: _.uniqueId("log_"),
         round: G.round || 1,
         turn: ctx.turn,
@@ -405,10 +409,26 @@ function _log(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, text: strin
         cardID: (cardID !== undefined && cardID !== null) ? cardID : undefined,
         cardTitle: (cardID !== undefined && cardID !== null) ? _cardTitle(G, cardID) : undefined,
         ts: Date.now(),
-    });
+    };
+    G.auditLog.push(entry);
     if (G.auditLog.length > 250) {
         G.auditLog = G.auditLog.slice(-250);
     }
+    return entry;
+}
+
+// Called once a played Magic card's effect actually resolves against another
+// player (a "steal"/"destroy"/... step, not a self-only cost step like
+// discard/sacrifice) - appends who it hit to the existing "played <Card>" log
+// line, same shape as upgrade/downgrade's "played <Card> on <Player>". Only
+// the first resolved target sticks (multi-step cards may hit more than one
+// player; the log stays a one-line summary rather than enumerating all of them).
+export function _recordCardTarget(G: UnstableUnicornsGame, entryId: string | undefined, targetPlayer: PlayerID) {
+    if (!entryId || !G.auditLog) { return; }
+    const entry = G.auditLog.find(e => e.id === entryId);
+    if (!entry || entry.targetPlayerID !== undefined) { return; }
+    entry.targetPlayerID = targetPlayer;
+    entry.text = `${entry.text} on ${_playerName(G, targetPlayer)}`;
 }
 
 function _cardTitle(G: UnstableUnicornsGame, cardID: CardID): string {
@@ -560,22 +580,19 @@ function ready(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
 const TIMER_MIN_SEC = 60;
 const TIMER_MAX_SEC = 300;
 
-// Host-only (seat 0). Adjust the turn-timer duration any time; only switch it on
-// once a turn has already run over 3 minutes (turnTimer.unlocked).
+// Host-only (seat 0). Toggle the timer on/off (the clock button) and/or adjust
+// its duration, any time - no unlock requirement.
 function setTurnTimer(G: UnstableUnicornsGame, ctx: Ctx, patch: { enabled?: boolean; durationSec?: number }) {
     if (String(ctx.playerID) !== "0" || (G.leftPlayers || []).indexOf("0") !== -1) {
         return INVALID_MOVE;
     }
     if (!G.turnTimer) {
-        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
     }
     if (patch && typeof patch.durationSec === "number" && isFinite(patch.durationSec)) {
         G.turnTimer.durationSec = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, Math.round(patch.durationSec)));
     }
     if (patch && typeof patch.enabled === "boolean") {
-        if (patch.enabled && !G.turnTimer.unlocked) {
-            return INVALID_MOVE;
-        }
         G.turnTimer.enabled = patch.enabled;
     }
 }
@@ -648,7 +665,15 @@ export function canPlayCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: Play
 function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, cardID: CardID) {
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
-    _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
+    const logEntry = _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
+
+    // A Magic card doesn't know who it's targeting yet - that's resolved once
+    // its effect actually runs (see enter() / executeDo()). Stash the log
+    // entry id so whichever code creates its scene can link the two.
+    if (G.deck[cardID] && G.deck[cardID].type === "magic") {
+        if (!G.clipboard.pendingCardLog) { G.clipboard.pendingCardLog = {}; }
+        G.clipboard.pendingCardLog[cardID] = logEntry.id;
+    }
 
     if (G.playerEffects[protagonist].findIndex(f => f.effect.key === "your_cards_cannot_be_neighed") > -1) {
         enter(G, ctx, { playerID: protagonist, cardID });

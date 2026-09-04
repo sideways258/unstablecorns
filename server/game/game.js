@@ -98,7 +98,7 @@ var UnstableUnicorns = {
             endGame: false,
             expansions: [],
             leftPlayers: [],
-            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false },
+            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined },
             babyStarter: [],
             ready: ready,
             uiHoverHandIndex: undefined,
@@ -127,6 +127,13 @@ var UnstableUnicorns = {
     turn: {
         // Skip any seat whose player has left the game.
         order: {
+            // Randomize who goes in which order each game. This only shuffles
+            // the TURN sequence - the host is still whoever sits in seat "0"
+            // (isHost checks are keyed on that, not on turn order), so the
+            // host keeps host controls no matter where they land in the order.
+            playOrder: function (G, ctx) {
+                return underscore_1["default"].shuffle(G.players.map(function (p) { return p.id; }));
+            },
             first: function (G, ctx) {
                 for (var pos = 0; pos < ctx.numPlayers; pos++) {
                     if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
@@ -153,7 +160,7 @@ var UnstableUnicorns = {
             }
             // stamp when this turn started so the (optional) turn timer can run
             if (!G.turnTimer) {
-                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
             }
             G.turnTimer.turnStartedAt = Date.now();
             // this is run whenever a new player starts its turn
@@ -197,12 +204,6 @@ var UnstableUnicorns = {
             }
         },
         onEnd: function (G, ctx) {
-            // Once any turn actually runs over 3 minutes, the host is allowed to
-            // switch the turn timer on.
-            if (G.turnTimer && G.turnTimer.turnStartedAt &&
-                (Date.now() - G.turnTimer.turnStartedAt) > 180000) {
-                G.turnTimer.unlocked = true;
-            }
             // Round counting: a round is complete once every active player has
             // taken a turn. Tracking distinct seats makes it immune to bonus
             // turns (Change of Luck) and to a player leaving mid-round.
@@ -283,7 +284,7 @@ function _log(G, ctx, playerID, text, cardID) {
     if (!G.auditLog) { G.auditLog = []; }
     var pl = G.players.find(function (p) { return p.id === String(playerID); });
     var hasCard = cardID !== undefined && cardID !== null;
-    G.auditLog.push({
+    var entry = {
         id: underscore_1["default"].uniqueId("log_"),
         round: G.round || 1,
         turn: ctx.turn,
@@ -293,11 +294,24 @@ function _log(G, ctx, playerID, text, cardID) {
         cardID: hasCard ? cardID : undefined,
         cardTitle: hasCard ? _cardTitle(G, cardID) : undefined,
         ts: Date.now()
-    });
+    };
+    G.auditLog.push(entry);
     if (G.auditLog.length > 250) {
         G.auditLog = G.auditLog.slice(-250);
     }
+    return entry;
 }
+// Called once a played Magic card's effect actually resolves against another
+// player - appends who it hit to the existing "played <Card>" log line. Only
+// the first resolved target sticks.
+function _recordCardTarget(G, entryId, targetPlayer) {
+    if (!entryId || !G.auditLog) { return; }
+    var entry = G.auditLog.find(function (e) { return e.id === entryId; });
+    if (!entry || entry.targetPlayerID !== undefined) { return; }
+    entry.targetPlayerID = targetPlayer;
+    entry.text = entry.text + " on " + _playerName(G, targetPlayer);
+}
+exports._recordCardTarget = _recordCardTarget;
 function _cardTitle(G, cardID) {
     var c = G.deck[cardID];
     return (c && c.title) || "a card";
@@ -439,22 +453,19 @@ function selectBaby(G, ctx, protagonist, cardID) {
 }
 var TIMER_MIN_SEC = 60;
 var TIMER_MAX_SEC = 300;
-// Host-only (seat 0). Adjust duration any time; only switch it on once a turn
-// has already run over 3 minutes (turnTimer.unlocked).
+// Host-only (seat 0). Toggle the timer on/off (the clock button) and/or adjust
+// its duration, any time - no unlock requirement.
 function setTurnTimer(G, ctx, patch) {
     if (String(ctx.playerID) !== "0" || (G.leftPlayers || []).indexOf("0") !== -1) {
         return core_1.INVALID_MOVE;
     }
     if (!G.turnTimer) {
-        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
     }
     if (patch && typeof patch.durationSec === "number" && isFinite(patch.durationSec)) {
         G.turnTimer.durationSec = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, Math.round(patch.durationSec)));
     }
     if (patch && typeof patch.enabled === "boolean") {
-        if (patch.enabled && !G.turnTimer.unlocked) {
-            return core_1.INVALID_MOVE;
-        }
         G.turnTimer.enabled = patch.enabled;
     }
 }
@@ -510,7 +521,13 @@ exports.canPlayCard = canPlayCard;
 function playCard(G, ctx, protagonist, cardID) {
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = underscore_1["default"].without(G.hand[protagonist], cardID);
-    _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID), cardID);
+    var logEntry = _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID), cardID);
+    // A Magic card doesn't know who it's targeting yet - stash the log entry
+    // id so enter()/executeDo() in do.js can link it to the eventual target.
+    if (G.deck[cardID] && G.deck[cardID].type === "magic") {
+        if (!G.clipboard.pendingCardLog) { G.clipboard.pendingCardLog = {}; }
+        G.clipboard.pendingCardLog[cardID] = logEntry.id;
+    }
     if (G.playerEffects[protagonist].findIndex(function (f) { return f.effect.key === "your_cards_cannot_be_neighed"; }) > -1) {
         do_1.enter(G, ctx, { playerID: protagonist, cardID: cardID });
     }

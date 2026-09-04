@@ -78,4 +78,41 @@ export function useSound(src: any, opts: any = {}) {
   return useSoundBase(src, { ...opts, volume: effectiveVolume });
 }
 
+// Reused across ticks rather than spun up fresh each time (browsers cap how
+// many AudioContexts can exist at once).
+let sharedTickCtx: AudioContext | null = null;
+
+/**
+ * A short percussive "tick" synthesized on the fly via the Web Audio API - no
+ * audio asset needed. Used by the turn timer's countdown. `volume` is 0..1
+ * and should already be pre-scaled by the caller (master volume / mute).
+ */
+export function playTick(volume: number) {
+  if (volume <= 0) return;
+  try {
+    const AudioCtxClass: typeof AudioContext | undefined =
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtxClass) return;
+    if (!sharedTickCtx) {
+      sharedTickCtx = new AudioCtxClass();
+    }
+    const ctx = sharedTickCtx;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1600, ctx.currentTime);
+    gain.gain.setValueAtTime(Math.min(1, volume), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.07);
+  } catch (e) {
+    /* audio is best-effort - never let a tick crash the board */
+  }
+}
+
 export default useSound;

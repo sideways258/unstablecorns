@@ -11,8 +11,10 @@ type Props = {
   /** Tell the game this player has left (removes their turn, stable and pending
    *  actions) before navigating away. */
   onLeave?: () => void;
-  /** Present only for games that support the host turn timer. */
-  turnTimer?: { enabled: boolean; durationSec: number; unlocked: boolean };
+  /** Present only for games that support the host turn timer. On/off is
+   *  controlled by the clock button on the board itself; this menu only
+   *  adjusts the duration. */
+  turnTimer?: { enabled: boolean; durationSec: number };
   onSetTurnTimer?: (patch: { enabled?: boolean; durationSec?: number }) => void;
 };
 
@@ -108,15 +110,8 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }:
 
           {isHost && turnTimer && onSetTurnTimer && (
             <>
-              <SectionTitle>Turn timer</SectionTitle>
+              <SectionTitle>Turn timer duration</SectionTitle>
               <TimerRow>
-                <ToggleButton
-                  $on={turnTimer.enabled}
-                  disabled={!turnTimer.unlocked && !turnTimer.enabled}
-                  onClick={() => onSetTurnTimer({ enabled: !turnTimer.enabled })}
-                >
-                  {turnTimer.enabled ? 'On' : 'Off'}
-                </ToggleButton>
                 <input
                   type="range"
                   min={1}
@@ -130,15 +125,10 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }:
                 />
                 <Percent>{Math.round(turnTimer.durationSec / 60)}m</Percent>
               </TimerRow>
-              {!turnTimer.unlocked && !turnTimer.enabled && (
-                <ConfirmText>Unlocks once a turn has run over 3 minutes.</ConfirmText>
-              )}
-              {turnTimer.enabled && (
-                <ConfirmText>
-                  A turn running past {Math.round(turnTimer.durationSec / 60)} min is ended
-                  automatically.
-                </ConfirmText>
-              )}
+              <ConfirmText>
+                Click the 🕐 clock button on the board to start or stop the timer. A turn
+                running past {Math.round(turnTimer.durationSec / 60)} min is ended automatically.
+              </ConfirmText>
             </>
           )}
 
@@ -278,22 +268,6 @@ const TimerRow = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-`;
-
-const ToggleButton = styled.button<{ $on: boolean }>`
-  min-width: 52px;
-  padding: 0.4em 0.7em;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 10pt;
-  cursor: pointer;
-  border: 2px solid #fff;
-  color: #fff;
-  background: ${(p) => (p.$on ? 'linear-gradient(135deg, #37d9a0, #1f9c74)' : 'transparent')};
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
 `;
 
 const Percent = styled.span`
