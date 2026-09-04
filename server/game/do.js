@@ -552,13 +552,16 @@ function findDestroyTargets(G, ctx, protagonist, info, sourceCard) {
     G.players.forEach(function (pl) {
         // special case
         // this is actually a combination of sacrifice and destroy
+        // Sacrificing is always limited to your own cards, but destroying an
+        // Upgrade card isn't restricted to other players - your own stable
+        // is a valid target too.
         if (info.type === "my_downgrade_other_upgrade") {
             G.upgradeDowngradeStable[pl.id].forEach(function (cid) {
                 var card = G.deck[cid];
                 if (pl.id === protagonist && card.type === "downgrade") {
                     targets.push({ playerID: pl.id, cardID: cid });
                 }
-                else if (pl.id !== protagonist && card.type === "upgrade") {
+                else if (card.type === "upgrade") {
                     targets.push({ playerID: pl.id, cardID: cid });
                 }
             });
