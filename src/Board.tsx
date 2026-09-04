@@ -312,6 +312,7 @@ const Board = (props: any) => {
         setC2CArrow(undefined);
         setHoverTargets(undefined);
         setShowStableOf(undefined);
+        moves.setUICardToCard(undefined);
         cancellableStates.forEach((b: BoardState) => moves.skipExecuteDo(playerID, (b as any).info.instructionID));
     };
 
@@ -1254,10 +1255,11 @@ const Bottom = styled.div`
 `;
 
 /* pulls the hand up so it tucks just under the stable instead of stacking
-   below it and pushing everything into the centre of the table */
+   below it and pushing everything into the centre of the table - but only a
+   little, so it doesn't cover the "Place your cards here" drop zone */
 const HandDock = styled.div`
     position: relative;
-    margin-top: -44px;
+    margin-top: -16px;
     z-index: 6;
 `;
 

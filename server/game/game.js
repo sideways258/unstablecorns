@@ -279,9 +279,10 @@ function _activePlayers(G) {
     return G.players.filter(function (p) { return (G.leftPlayers || []).indexOf(p.id) === -1; });
 }
 // Append an entry to the shared audit log (what each player did).
-function _log(G, ctx, playerID, text) {
+function _log(G, ctx, playerID, text, cardID) {
     if (!G.auditLog) { G.auditLog = []; }
     var pl = G.players.find(function (p) { return p.id === String(playerID); });
+    var hasCard = cardID !== undefined && cardID !== null;
     G.auditLog.push({
         id: underscore_1["default"].uniqueId("log_"),
         round: G.round || 1,
@@ -289,6 +290,8 @@ function _log(G, ctx, playerID, text) {
         playerID: String(playerID),
         playerName: (pl && pl.name) || ("Player " + playerID),
         text: text,
+        cardID: hasCard ? cardID : undefined,
+        cardTitle: hasCard ? _cardTitle(G, cardID) : undefined,
         ts: Date.now()
     });
     if (G.auditLog.length > 250) {
@@ -507,7 +510,7 @@ exports.canPlayCard = canPlayCard;
 function playCard(G, ctx, protagonist, cardID) {
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = underscore_1["default"].without(G.hand[protagonist], cardID);
-    _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID));
+    _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID), cardID);
     if (G.playerEffects[protagonist].findIndex(function (f) { return f.effect.key === "your_cards_cannot_be_neighed"; }) > -1) {
         do_1.enter(G, ctx, { playerID: protagonist, cardID: cardID });
     }
@@ -527,7 +530,7 @@ function playUpgradeDowngradeCard(G, ctx, protagonist, targetPlayer, cardID) {
     G.hand[protagonist] = underscore_1["default"].without(G.hand[protagonist], cardID);
     _log(G, ctx, protagonist, String(targetPlayer) === String(protagonist)
         ? "played " + _cardTitle(G, cardID) + " on themselves"
-        : "played " + _cardTitle(G, cardID) + " on " + _playerName(G, targetPlayer));
+        : "played " + _cardTitle(G, cardID) + " on " + _playerName(G, targetPlayer), cardID);
     if (G.playerEffects[protagonist].findIndex(function (f) { return f.effect.key === "your_cards_cannot_be_neighed"; }) > -1) {
         do_1.enter(G, ctx, { playerID: targetPlayer, cardID: cardID });
     }
@@ -546,7 +549,7 @@ function playNeigh(G, ctx, cardID, protagonist, roundIndex) {
     if (G.neighDiscussion) {
         G.hand[protagonist] = underscore_1["default"].without(G.hand[protagonist], cardID);
         G.discardPile = __spreadArrays(G.discardPile, [cardID]);
-        _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID));
+        _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID), cardID);
         var round = G.neighDiscussion.rounds[roundIndex];
         // check if there was already a neigh vote during this round
         // if yes do nothing
@@ -567,7 +570,7 @@ function playSuperNeigh(G, ctx, cardID, protagonist, roundIndex) {
     if (G.neighDiscussion) {
         G.hand[protagonist] = underscore_1["default"].without(G.hand[protagonist], cardID);
         G.discardPile = __spreadArrays(G.discardPile, [cardID]);
-        _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID));
+        _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID), cardID);
         var round = G.neighDiscussion.rounds[roundIndex];
         // check if there was already a neigh vote during this round
         // if yes do nothing
@@ -705,24 +708,37 @@ function skipExecuteDo(G, ctx, protagonist, instructionID) {
     if (found === null) {
         return;
     }
-    var scene = found[0], action = found[1];
-    if (scene.mandatory === false) {
-        // Cancelling an optional "you may X, then Y" scene puts it back to
-        // "not started": every step that has not actually run yet returns to
-        // "open", so the player can still activate it later (cost step first).
-        // Nothing is marked executed, so a later step can never unlock by
-        // skipping an earlier one.
-        scene.actions.forEach(function (ac) {
-            ac.instructions
-                .filter(function (ins) { return ins.protagonist === protagonist && ins.state !== "executed"; })
-                .forEach(function (ins) { ins.state = "open"; });
-        });
+    var scene = found[0], instruction = found[2];
+    // has any part of this scene actually run yet (for anyone)?
+    var anyExecuted = scene.actions.some(function (ac) {
+        return ac.instructions.some(function (ins) { return ins.state === "executed"; });
+    });
+    var sourceCardID = (instruction.ui && instruction.ui.info) ? instruction.ui.info.source : undefined;
+    // Nothing has actually happened yet and the trigger was a Magic card that is
+    // still mid-play (sitting in the temporary stable): take it back to hand and
+    // refund the play - exactly as if it was never played.
+    if (!anyExecuted && sourceCardID !== undefined &&
+        (G.temporaryStable[protagonist] || []).indexOf(sourceCardID) !== -1) {
+        G.temporaryStable[protagonist] = underscore_1["default"].without(G.temporaryStable[protagonist], sourceCardID);
+        G.hand[protagonist] = __spreadArrays(G.hand[protagonist], [sourceCardID]);
+        if (G.countPlayedCardsInActionPhase > 0) {
+            G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase - 1;
+        }
+        G.script.scenes = G.script.scenes.filter(function (sc) { return sc.id !== scene.id; });
+        G.uiCardToCard = undefined;
+        G.uiExecuteDo = undefined;
+        _log(G, ctx, protagonist, "took back " + _cardTitle(G, sourceCardID), sourceCardID);
+        return;
     }
-    else {
-        action.instructions
-            .filter(function (ins) { return ins.protagonist === protagonist; })
-            .forEach(function (ins) { ins.state = "executed"; });
-    }
+    // Otherwise reset every step that has not actually run yet back to "open", so
+    // the effect is exactly as it was before the player started aiming it and can
+    // be triggered again. Nothing is marked "executed" / skipped, so a later step
+    // can never unlock by cancelling an earlier one.
+    scene.actions.forEach(function (ac) {
+        ac.instructions
+            .filter(function (ins) { return ins.protagonist === protagonist && ins.state !== "executed"; })
+            .forEach(function (ins) { ins.state = "open"; });
+    });
 }
 //
 function setUIHoverHandIndex(G, ctx, index) {

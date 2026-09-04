@@ -73,6 +73,9 @@ export interface AuditEntry {
     playerID: PlayerID;
     playerName: string;
     text: string;
+    /** the card this entry is about (for the hover preview in the log window) */
+    cardID?: CardID;
+    cardTitle?: string;
     ts: number;
 }
 
@@ -383,7 +386,7 @@ export function _activePlayers(G: UnstableUnicornsGame): Player[] {
 }
 
 // Append an entry to the shared audit log (what each player did).
-function _log(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, text: string) {
+function _log(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, text: string, cardID?: CardID) {
     if (!G.auditLog) { G.auditLog = []; }
     const pl = G.players.find(p => p.id === String(playerID));
     G.auditLog.push({
@@ -393,6 +396,8 @@ function _log(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, text: strin
         playerID: String(playerID),
         playerName: (pl && pl.name) || `Player ${playerID}`,
         text,
+        cardID: (cardID !== undefined && cardID !== null) ? cardID : undefined,
+        cardTitle: (cardID !== undefined && cardID !== null) ? _cardTitle(G, cardID) : undefined,
         ts: Date.now(),
     });
     if (G.auditLog.length > 250) {
@@ -637,7 +642,7 @@ export function canPlayCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: Play
 function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, cardID: CardID) {
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
-    _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`);
+    _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
 
     if (G.playerEffects[protagonist].findIndex(f => f.effect.key === "your_cards_cannot_be_neighed") > -1) {
         enter(G, ctx, { playerID: protagonist, cardID });
@@ -658,7 +663,7 @@ function playUpgradeDowngradeCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist
     G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
     _log(G, ctx, protagonist, String(targetPlayer) === String(protagonist)
         ? `played ${_cardTitle(G, cardID)} on themselves`
-        : `played ${_cardTitle(G, cardID)} on ${_playerName(G, targetPlayer)}`);
+        : `played ${_cardTitle(G, cardID)} on ${_playerName(G, targetPlayer)}`, cardID);
 
     if (G.playerEffects[protagonist].findIndex(f => f.effect.key === "your_cards_cannot_be_neighed") > -1) {
         enter(G, ctx, { playerID: targetPlayer, cardID });
@@ -678,7 +683,7 @@ function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonis
     if (G.neighDiscussion) {
         G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
         G.discardPile = [...G.discardPile, cardID];
-        _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`);
+        _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
 
         const round = G.neighDiscussion.rounds[roundIndex];
         // check if there was already a neigh vote during this round
@@ -701,7 +706,7 @@ function playSuperNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, prota
     if (G.neighDiscussion) {
         G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
         G.discardPile = [...G.discardPile, cardID];
-        _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`);
+        _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
 
         const round = G.neighDiscussion.rounds[roundIndex];
         // check if there was already a neigh vote during this round
@@ -848,24 +853,40 @@ function skipExecuteDo(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID,
     if (found === null) {
         return;
     }
-    const [scene, action] = found;
+    const [scene, , instruction] = found;
 
-    if (scene.mandatory === false) {
-        // Cancelling an optional "you may X, then Y" scene puts it back to
-        // "not started": every step that has not actually run yet returns to
-        // "open", so the player can still activate it later (cost step first).
-        // Nothing is marked executed, so a later step can never unlock by
-        // skipping an earlier one.
-        scene.actions.forEach(ac => {
-            ac.instructions
-                .filter(ins => ins.protagonist === protagonist && ins.state !== "executed")
-                .forEach(ins => { ins.state = "open"; });
-        });
-    } else {
-        action.instructions
-            .filter(ins => ins.protagonist === protagonist)
-            .forEach(ins => { ins.state = "executed"; });
+    // has any part of this scene actually run yet (for anyone)?
+    const anyExecuted = scene.actions.some(ac =>
+        ac.instructions.some(ins => ins.state === "executed"));
+
+    const sourceCardID = instruction.ui.info?.source;
+
+    // Nothing has actually happened yet and the trigger was a Magic card that is
+    // still mid-play (sitting in the temporary stable): take it back to hand and
+    // refund the play - exactly as if it was never played.
+    if (!anyExecuted && sourceCardID !== undefined &&
+        (G.temporaryStable[protagonist] || []).indexOf(sourceCardID) !== -1) {
+        G.temporaryStable[protagonist] = _.without(G.temporaryStable[protagonist], sourceCardID);
+        G.hand[protagonist] = [...G.hand[protagonist], sourceCardID];
+        if (G.countPlayedCardsInActionPhase > 0) {
+            G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase - 1;
+        }
+        G.script.scenes = G.script.scenes.filter(sc => sc.id !== scene.id);
+        G.uiCardToCard = undefined;
+        G.uiExecuteDo = undefined;
+        _log(G, ctx, protagonist, `took back ${_cardTitle(G, sourceCardID)}`, sourceCardID);
+        return;
     }
+
+    // Otherwise reset every step that has not actually run yet back to "open", so
+    // the effect is exactly as it was before the player started aiming it and can
+    // be triggered again. Nothing is marked "executed" / skipped, so a later step
+    // can never unlock by cancelling an earlier one.
+    scene.actions.forEach(ac => {
+        ac.instructions
+            .filter(ins => ins.protagonist === protagonist && ins.state !== "executed")
+            .forEach(ins => { ins.state = "open"; });
+    });
 }
 
 //
