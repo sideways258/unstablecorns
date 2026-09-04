@@ -63,6 +63,8 @@ function leave(G: UnstableUnicornsGame, ctx: Ctx, param: ParamLeave) {
             }
         }
     });
+
+    _settleUnfulfillableDiscards(G, ctx);
 }
 
 type ParamEnter = {
@@ -206,6 +208,8 @@ export function enter(G: UnstableUnicornsGame, ctx: Ctx, param: ParamEnter) {
             }
         }
     });
+
+    _settleUnfulfillableDiscards(G, ctx);
 }
 
 export function canEnter(G: UnstableUnicornsGame, ctx: Ctx, param: ParamEnter) {
@@ -329,6 +333,46 @@ export function executeDo(G: UnstableUnicornsGame, ctx: Ctx, instructionID: stri
                 }
             }
         }
+    }
+
+    // a multi-count discard (e.g. "discard 2 cards") can run out of hand mid-way
+    _settleUnfulfillableDiscards(G, ctx);
+}
+
+// If a mandatory "discard from hand" step can never be fulfilled (the player has
+// no cards left that match), settle it instead of letting it block the game
+// forever - you can't discard what you don't have. Applies to both plain
+// click-to-discard instructions and popup discards once committed.
+export function _settleUnfulfillableDiscards(G: UnstableUnicornsGame, ctx: Ctx) {
+    let changed = false;
+    G.script.scenes.forEach(scene => {
+        // Only settle scenes the player is actually committed to (forced from
+        // the start, or a "you may..." popup they already chose to activate).
+        // An un-committed optional discard stays as-is so the player still gets
+        // to decide - it just won't have anything to click once they commit.
+        if (scene.mandatory !== true) {
+            return;
+        }
+        scene.actions.forEach(action => {
+            action.instructions.forEach(ins => {
+                if ((ins.state === "open" || ins.state === "in_progress") && ins.do.key === "discard") {
+                    const targets = findDiscardTargets(G, ctx, ins.protagonist, ins.do.info);
+                    if (targets.length === 0) {
+                        action.instructions
+                            .filter(i => i.protagonist === ins.protagonist)
+                            .forEach(i => { i.state = "executed"; });
+                        changed = true;
+                    }
+                }
+            });
+        });
+    });
+    if (changed) {
+        G.script.scenes = G.script.scenes.filter(scene =>
+            scene.actions.some(action =>
+                action.instructions.some(ins => ins.state !== "executed")
+            )
+        );
     }
 }
 

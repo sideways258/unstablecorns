@@ -2,7 +2,7 @@ import type { Game, Ctx } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 import type { Player, PlayerID } from './player';
 import type { CardID, Card, CardUI, OnEnterAddEffect } from './card';
-import { canEnter, Do, enter, _findInstructionWithID } from './do';
+import { canEnter, Do, enter, _findInstructionWithID, _settleUnfulfillableDiscards } from './do';
 import { initializeDeck } from './card';
 import { CONSTANTS } from './constants';
 import { executeDo } from './do';
@@ -846,6 +846,9 @@ function end(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
 
 function commit(G: UnstableUnicornsGame, ctx: Ctx, sceneID: string) {
     G.script.scenes.find(sc => sc.id === sceneID)!.mandatory = true;
+    // e.g. "Discard 2 cards" committed with an empty hand: settle it immediately
+    // instead of leaving the player stuck with nothing to click on.
+    _settleUnfulfillableDiscards(G, ctx);
 }
 
 function skipExecuteDo(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, instructionID: string) {
@@ -967,6 +970,8 @@ export function _addSceneFromDo(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardI
             G.script.scenes = [...G.script.scenes, newScene];
         }
     });
+
+    _settleUnfulfillableDiscards(G, ctx);
 }
 
 

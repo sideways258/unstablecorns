@@ -702,6 +702,9 @@ function end(G, ctx, protagonist) {
 }
 function commit(G, ctx, sceneID) {
     G.script.scenes.find(function (sc) { return sc.id === sceneID; }).mandatory = true;
+    // e.g. "Discard 2 cards" committed with an empty hand: settle it immediately
+    // instead of leaving the player stuck with nothing to click on.
+    do_1._settleUnfulfillableDiscards(G, ctx);
 }
 function skipExecuteDo(G, ctx, protagonist, instructionID) {
     var found = do_1._findInstructionWithID(G, instructionID);
@@ -806,6 +809,7 @@ function _addSceneFromDo(G, ctx, cardID, owner, trigger) {
             G.script.scenes = __spreadArrays(G.script.scenes, [newScene]);
         }
     });
+    do_1._settleUnfulfillableDiscards(G, ctx);
 }
 exports._addSceneFromDo = _addSceneFromDo;
 // find all scenes that have already started and are not finished

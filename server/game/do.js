@@ -73,6 +73,7 @@ function leave(G, ctx, param) {
             }
         }
     });
+    _settleUnfulfillableDiscards(G, ctx);
 }
 function enter(G, ctx, param) {
     var _a;
@@ -199,6 +200,7 @@ function enter(G, ctx, param) {
             }
         }
     });
+    _settleUnfulfillableDiscards(G, ctx);
 }
 exports.enter = enter;
 function canEnter(G, ctx, param) {
@@ -311,8 +313,47 @@ function executeDo(G, ctx, instructionID, param) {
             }
         }
     }
+    // a multi-count discard (e.g. "discard 2 cards") can run out of hand mid-way
+    _settleUnfulfillableDiscards(G, ctx);
 }
 exports.executeDo = executeDo;
+// If a mandatory "discard from hand" step can never be fulfilled (the player has
+// no cards left that match), settle it instead of letting it block the game
+// forever - you can't discard what you don't have. Applies to both plain
+// click-to-discard instructions and popup discards once committed.
+function _settleUnfulfillableDiscards(G, ctx) {
+    var changed = false;
+    G.script.scenes.forEach(function (scene) {
+        // Only settle scenes the player is actually committed to (forced from
+        // the start, or a "you may..." popup they already chose to activate).
+        // An un-committed optional discard stays as-is so the player still gets
+        // to decide - it just won't have anything to click once they commit.
+        if (scene.mandatory !== true) {
+            return;
+        }
+        scene.actions.forEach(function (action) {
+            action.instructions.forEach(function (ins) {
+                if ((ins.state === "open" || ins.state === "in_progress") && ins["do"].key === "discard") {
+                    var targets = findDiscardTargets(G, ctx, ins.protagonist, ins["do"].info);
+                    if (targets.length === 0) {
+                        action.instructions
+                            .filter(function (i) { return i.protagonist === ins.protagonist; })
+                            .forEach(function (i) { i.state = "executed"; });
+                        changed = true;
+                    }
+                }
+            });
+        });
+    });
+    if (changed) {
+        G.script.scenes = G.script.scenes.filter(function (scene) {
+            return scene.actions.some(function (action) {
+                return action.instructions.some(function (ins) { return ins.state !== "executed"; });
+            });
+        });
+    }
+}
+exports._settleUnfulfillableDiscards = _settleUnfulfillableDiscards;
 function steal(G, ctx, param) {
     leave(G, ctx, { playerID: findOwnerOfCard(G, param.cardID), cardID: param.cardID });
     enter(G, ctx, { playerID: param.protagonist, cardID: param.cardID });
