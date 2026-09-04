@@ -435,6 +435,9 @@ function findStealTargets(G, ctx, protagonist, info) {
                 }
                 ;
                 G.upgradeDowngradeStable[pl.id].forEach(function (c) {
+                    if (G.deck[c].type !== "upgrade") {
+                        return;
+                    }
                     if (canEnter(G, ctx, { playerID: protagonist, cardID: c })) {
                         targets.push({ playerID: pl.id, cardID: c });
                     }
@@ -560,7 +563,9 @@ function findDestroyTargets(G, ctx, protagonist, info, sourceCard) {
                 }
             });
         }
-        if (pl.id === protagonist) {
+        // "any" (e.g. Two-For-One) may also target the protagonist's own
+        // stable; every other destroy type only targets other players'.
+        if (pl.id === protagonist && info.type !== "any") {
             return;
         }
         if (info.type === "unicorn") {
@@ -597,7 +602,7 @@ function findDestroyTargets(G, ctx, protagonist, info, sourceCard) {
                     if (sourceCard && G.deck[sourceCard].type === "magic" && ((_a = card.passive) === null || _a === void 0 ? void 0 : _a.includes("cannot_be_destroyed_by_magic"))) {
                         return;
                     }
-                    if (G.playerEffects[pl.id].find(function (s) { return s.effect.key === "your_unicorns_cannot_be_destroyed"; })) {
+                    if (pl.id !== protagonist && G.playerEffects[pl.id].find(function (s) { return s.effect.key === "your_unicorns_cannot_be_destroyed"; })) {
                         return;
                     }
                     targets.push({ playerID: pl.id, cardID: cid });

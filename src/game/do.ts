@@ -476,6 +476,7 @@ export function findStealTargets(G: UnstableUnicornsGame, ctx: Ctx, protagonist:
             G.players.forEach(pl => {
                 if (pl.id === protagonist) { return };
                 G.upgradeDowngradeStable[pl.id].forEach(c => {
+                    if (G.deck[c].type !== "upgrade") { return; }
                     if (canEnter(G, ctx, { playerID: protagonist, cardID: c })) {
                         targets.push({ playerID: pl.id, cardID: c });
                     }
@@ -677,7 +678,9 @@ export function findDestroyTargets(G: UnstableUnicornsGame, ctx: Ctx, protagonis
             });
         }
 
-        if (pl.id === protagonist) {
+        // "any" (e.g. Two-For-One) may also target the protagonist's own
+        // stable; every other destroy type only targets other players'.
+        if (pl.id === protagonist && info.type !== "any") {
             return;
         }
 
@@ -711,7 +714,7 @@ export function findDestroyTargets(G: UnstableUnicornsGame, ctx: Ctx, protagonis
                     if (sourceCard && G.deck[sourceCard].type === "magic" && card.passive?.includes("cannot_be_destroyed_by_magic")) {
                         return;
                     }
-                    if (G.playerEffects[pl.id].find(s => s.effect.key === "your_unicorns_cannot_be_destroyed")) {
+                    if (pl.id !== protagonist && G.playerEffects[pl.id].find(s => s.effect.key === "your_unicorns_cannot_be_destroyed")) {
                         return;
                     }
                     targets.push({ playerID: pl.id, cardID: cid });
