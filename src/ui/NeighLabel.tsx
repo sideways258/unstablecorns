@@ -27,6 +27,8 @@ type Props = {
     showPlayNeighButton: boolean;
     onPlayNeighClick: () => void;
     onDontPlayNeighClick: () => void;
+    /** Names of players who still haven't clicked "Neigh" or "Don't neigh" this round. */
+    pendingPlayerNames?: string[];
 }
 
 export type NeighLabelRole = "original_initiator" | "new_initiator" | "did_neigh" | "did_not_neigh" | "open" | "original_initiator_can_counterneigh";
@@ -130,6 +132,17 @@ const NeighLabel = (props: Props) => {
                         )}
                     </Buttons>
                 )}
+
+                {props.pendingPlayerNames && props.pendingPlayerNames.length > 0 && (
+                    <Pending>
+                        <PendingLabel>Waiting on:</PendingLabel>
+                        <PendingChips>
+                            {props.pendingPlayerNames.map(name => (
+                                <PendingChip key={name}>{name}</PendingChip>
+                            ))}
+                        </PendingChips>
+                    </Pending>
+                )}
             </Wrapper>
         </Backdrop>,
         document.body
@@ -230,6 +243,38 @@ const NeighButton = styled.div`
     ${chunky}
     background: linear-gradient(135deg, #4ade80, #148f4b);
     box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
+`;
+
+const Pending = styled.div`
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 10px;
+`;
+
+const PendingLabel = styled.span`
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.65);
+    flex: none;
+`;
+
+const PendingChips = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+`;
+
+const PendingChip = styled.span`
+    padding: 0.3em 0.7em;
+    border-radius: 999px;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #241d14;
+    background: linear-gradient(135deg, #ffd76a, #f8b500);
 `;
 
 export default NeighLabel;

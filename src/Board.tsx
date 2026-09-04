@@ -534,6 +534,19 @@ const Board = (props: any) => {
                 {C2CArrow !== undefined &&
                     <RainbowArrow from={{ x: C2CArrow!.fromX, y: C2CArrow!.fromY }} to={{ x: C2CArrow!.toX, y: C2CArrow!.toY }} />
                 }
+                <TurnOrderPanel>
+                    {ctx.playOrder
+                        .map((pos: string) => G.players.find(pl => pl.id === pos))
+                        .filter((pl: any) => pl && (G.leftPlayers || []).indexOf(pl.id) === -1)
+                        .map((pl: any) => (
+                            <TurnOrderRow key={pl.id} $active={ctx.currentPlayer === pl.id}>
+                                <div>{pl.name}</div>
+                                <NeighCount title="Neigh cards played">
+                                    🚫 {(G.neighCounts && G.neighCounts[pl.id]) || 0}
+                                </NeighCount>
+                            </TurnOrderRow>
+                        ))}
+                </TurnOrderPanel>
                 <Top>
                     {renderTop(G, ctx, ctx.currentPlayer === playerID, boardStates)}
                 </Top>
@@ -984,9 +997,14 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
 
     const didVote = currentRound.playerState[playerID].vote !== "undecided";
 
+    const pendingPlayerNames = Object.keys(currentRound.playerState)
+        .filter(pid => currentRound.playerState[pid].vote === "undecided")
+        .map(pid => G.players.find(p => p.id === pid)?.name)
+        .filter((n): n is string => !!n);
+
     return (
         <NeighLabelWrapper>
-            <NeighLabel card={G.deck[G.neighDiscussion.cardID]} originalInitiatorName={originalInitiatorName} targetName={targetName} playerNames={G.players.map(p => p.name)} newInitiatorName={newInitiatorName} role={role} didVote={didVote} numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length} showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined} onPlayNeighClick={onPlayNeighClick} onDontPlayNeighClick={onDontPlayNeighClick} />
+            <NeighLabel card={G.deck[G.neighDiscussion.cardID]} originalInitiatorName={originalInitiatorName} targetName={targetName} playerNames={G.players.map(p => p.name)} newInitiatorName={newInitiatorName} role={role} didVote={didVote} numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length} showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined} onPlayNeighClick={onPlayNeighClick} onDontPlayNeighClick={onDontPlayNeighClick} pendingPlayerNames={pendingPlayerNames} />
         </NeighLabelWrapper>
     );
 }
@@ -1243,6 +1261,42 @@ const Top = styled.div`
     top: 22px;
     z-index: 2;
     height: 50px;
+`;
+
+const TurnOrderPanel = styled.div`
+    position: absolute;
+    top: 60px;
+    right: 6px;
+    bottom: 8px;
+    width: 78px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+    overflow-y: auto;
+`;
+
+const TurnOrderRow = styled.div<{ $active: boolean }>`
+    box-sizing: border-box;
+    padding: 0.4em 0.3em;
+    border-radius: 8px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    word-break: break-word;
+    border: 2px solid ${props => props.$active ? '#f8b500' : 'rgba(255,255,255,0.25)'};
+    background: ${props => props.$active ? 'linear-gradient(135deg, #ffd76a, #f8b500)' : 'rgba(0,0,0,0.35)'};
+    color: ${props => props.$active ? '#241d14' : '#fff'};
+    box-shadow: ${props => props.$active ? '0 0 10px rgba(248,181,0,0.6)' : 'none'};
+`;
+
+const NeighCount = styled.div`
+    margin-top: 2px;
+    font-size: 8pt;
+    font-weight: 700;
+    opacity: 0.85;
 `;
 
 const Main = styled.div`

@@ -63,6 +63,9 @@ export interface UnstableUnicornsGame extends Game {
     /** Shared, append-only history of what each player did (card plays, neighs,
      *  draws, ...), shown to everyone in the audit-log window. */
     auditLog: AuditEntry[];
+    /** How many Neigh / Super Neigh cards each player has played this game,
+     *  shown next to their name in the turn order panel. */
+    neighCounts: { [key: string]: number };
 }
 
 export interface AuditEntry {
@@ -172,15 +175,17 @@ const UnstableUnicorns = {
         let upgradeDowngradeStable: { [key: string]: CardID[] } = {};
         let playerEffects: { [key: string]: { cardID: CardID, effect: Effect }[] } = {};
         let ready: {[key: string]: boolean} = {};
+        let neighCounts: { [key: string]: number } = {};
 
         players.forEach(pl => {
             ready[pl.id] = false;
             hand[pl.id] = _.first(drawPile, CONSTANTS.numberOfHandCardsAtStart);
             drawPile = _.rest(drawPile, CONSTANTS.numberOfHandCardsAtStart);
-            stable[pl.id] = []; 
+            stable[pl.id] = [];
             temporaryStable[pl.id] = [];
-            upgradeDowngradeStable[pl.id] = []; 
+            upgradeDowngradeStable[pl.id] = [];
             playerEffects[pl.id] = [];
+            neighCounts[pl.id] = 0;
         });
 
         return {
@@ -201,7 +206,7 @@ const UnstableUnicorns = {
             endGame: false,
             expansions: [],
             leftPlayers: [],
-            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined },
+            turnTimer: { enabled: false, durationSec: 60, turnStartedAt: undefined },
             babyStarter: [],
             ready,
             uiHoverHandIndex: undefined,
@@ -211,6 +216,7 @@ const UnstableUnicorns = {
             round: 1,
             roundSeats: [],
             auditLog: [],
+            neighCounts,
         };
     },
     phases: {
@@ -230,18 +236,23 @@ const UnstableUnicorns = {
     turn: {
         // Skip any seat whose player has left the game.
         order: {
-            // Randomize who goes in which order each game. This only shuffles
-            // the TURN sequence - the host is still whoever sits in seat "0"
-            // (isHost checks are keyed on that, not on turn order), so the
-            // host keeps host controls no matter where they land in the order.
-            playOrder: (G: UnstableUnicornsGame, ctx: Ctx) => _.shuffle(G.players.map(p => p.id)),
+            // The player who goes FIRST is randomized each game, but from
+            // there turns proceed in normal seat order (0, 1, 2, ...) - i.e.
+            // left to right around the table - rather than jumping around.
+            // The host is unaffected either way (isHost checks are keyed on
+            // seat "0", not on turn order), so they keep host controls no
+            // matter when their turn comes up.
             first: (G: UnstableUnicornsGame, ctx: Ctx) => {
+                const eligible: number[] = [];
                 for (let pos = 0; pos < ctx.numPlayers; pos++) {
                     if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
-                        return pos;
+                        eligible.push(pos);
                     }
                 }
-                return 0;
+                if (eligible.length === 0) {
+                    return 0;
+                }
+                return _.sample(eligible)!;
             },
             next: (G: UnstableUnicornsGame, ctx: Ctx) => {
                 let pos = ctx.playOrderPos;
@@ -261,7 +272,7 @@ const UnstableUnicorns = {
 
             // stamp when this turn started so the (optional) turn timer can run
             if (!G.turnTimer) {
-                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
+                G.turnTimer = { enabled: false, durationSec: 60, turnStartedAt: undefined };
             }
             G.turnTimer.turnStartedAt = Date.now();
 
@@ -587,13 +598,18 @@ function setTurnTimer(G: UnstableUnicornsGame, ctx: Ctx, patch: { enabled?: bool
         return INVALID_MOVE;
     }
     if (!G.turnTimer) {
-        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
+        G.turnTimer = { enabled: false, durationSec: 60, turnStartedAt: undefined };
     }
     if (patch && typeof patch.durationSec === "number" && isFinite(patch.durationSec)) {
         G.turnTimer.durationSec = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, Math.round(patch.durationSec)));
     }
     if (patch && typeof patch.enabled === "boolean") {
         G.turnTimer.enabled = patch.enabled;
+        // Clicking the clock to (re)start it always gives a fresh countdown,
+        // rather than continuing from whenever the current turn actually began.
+        if (patch.enabled) {
+            G.turnTimer.turnStartedAt = Date.now();
+        }
     }
 }
 
@@ -726,6 +742,8 @@ function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonis
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
         round.state = "neigh";
+        if (!G.neighCounts) { G.neighCounts = {}; }
+        G.neighCounts[protagonist] = (G.neighCounts[protagonist] || 0) + 1;
         G.neighDiscussion.rounds.push({
             state: "open",
             playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
@@ -749,6 +767,8 @@ function playSuperNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, prota
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
         round.state = "neigh";
+        if (!G.neighCounts) { G.neighCounts = {}; }
+        G.neighCounts[protagonist] = (G.neighCounts[protagonist] || 0) + 1;
 
         const cardWasNeighed = (G.neighDiscussion.rounds.length+1) % 2 === 0;
         if (cardWasNeighed) {

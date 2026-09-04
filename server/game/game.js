@@ -71,6 +71,7 @@ var UnstableUnicorns = {
         var upgradeDowngradeStable = {};
         var playerEffects = {};
         var ready = {};
+        var neighCounts = {};
         players.forEach(function (pl) {
             ready[pl.id] = false;
             hand[pl.id] = underscore_1["default"].first(drawPile, constants_1.CONSTANTS.numberOfHandCardsAtStart);
@@ -79,6 +80,7 @@ var UnstableUnicorns = {
             temporaryStable[pl.id] = [];
             upgradeDowngradeStable[pl.id] = [];
             playerEffects[pl.id] = [];
+            neighCounts[pl.id] = 0;
         });
         return {
             players: players,
@@ -98,7 +100,7 @@ var UnstableUnicorns = {
             endGame: false,
             expansions: [],
             leftPlayers: [],
-            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined },
+            turnTimer: { enabled: false, durationSec: 60, turnStartedAt: undefined },
             babyStarter: [],
             ready: ready,
             uiHoverHandIndex: undefined,
@@ -107,7 +109,8 @@ var UnstableUnicorns = {
             lastNeighResult: undefined,
             round: 1,
             roundSeats: [],
-            auditLog: []
+            auditLog: [],
+            neighCounts: neighCounts
         };
     },
     phases: {
@@ -127,20 +130,23 @@ var UnstableUnicorns = {
     turn: {
         // Skip any seat whose player has left the game.
         order: {
-            // Randomize who goes in which order each game. This only shuffles
-            // the TURN sequence - the host is still whoever sits in seat "0"
-            // (isHost checks are keyed on that, not on turn order), so the
-            // host keeps host controls no matter where they land in the order.
-            playOrder: function (G, ctx) {
-                return underscore_1["default"].shuffle(G.players.map(function (p) { return p.id; }));
-            },
+            // The player who goes FIRST is randomized each game, but from
+            // there turns proceed in normal seat order (0, 1, 2, ...) - i.e.
+            // left to right around the table - rather than jumping around.
+            // The host is unaffected either way (isHost checks are keyed on
+            // seat "0", not on turn order), so they keep host controls no
+            // matter when their turn comes up.
             first: function (G, ctx) {
+                var eligible = [];
                 for (var pos = 0; pos < ctx.numPlayers; pos++) {
                     if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
-                        return pos;
+                        eligible.push(pos);
                     }
                 }
-                return 0;
+                if (eligible.length === 0) {
+                    return 0;
+                }
+                return underscore_1["default"].sample(eligible);
             },
             next: function (G, ctx) {
                 var pos = ctx.playOrderPos;
@@ -160,7 +166,7 @@ var UnstableUnicorns = {
             }
             // stamp when this turn started so the (optional) turn timer can run
             if (!G.turnTimer) {
-                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
+                G.turnTimer = { enabled: false, durationSec: 60, turnStartedAt: undefined };
             }
             G.turnTimer.turnStartedAt = Date.now();
             // this is run whenever a new player starts its turn
@@ -460,13 +466,18 @@ function setTurnTimer(G, ctx, patch) {
         return core_1.INVALID_MOVE;
     }
     if (!G.turnTimer) {
-        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined };
+        G.turnTimer = { enabled: false, durationSec: 60, turnStartedAt: undefined };
     }
     if (patch && typeof patch.durationSec === "number" && isFinite(patch.durationSec)) {
         G.turnTimer.durationSec = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, Math.round(patch.durationSec)));
     }
     if (patch && typeof patch.enabled === "boolean") {
         G.turnTimer.enabled = patch.enabled;
+        // Clicking the clock to (re)start it always gives a fresh countdown,
+        // rather than continuing from whenever the current turn actually began.
+        if (patch.enabled) {
+            G.turnTimer.turnStartedAt = Date.now();
+        }
     }
 }
 // Any player may call this once the current turn has run past the timer.
@@ -577,6 +588,8 @@ function playNeigh(G, ctx, cardID, protagonist, roundIndex) {
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
         round.state = "neigh";
+        if (!G.neighCounts) { G.neighCounts = {}; }
+        G.neighCounts[protagonist] = (G.neighCounts[protagonist] || 0) + 1;
         G.neighDiscussion.rounds.push({
             state: "open",
             playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
@@ -598,6 +611,8 @@ function playSuperNeigh(G, ctx, cardID, protagonist, roundIndex) {
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
         round.state = "neigh";
+        if (!G.neighCounts) { G.neighCounts = {}; }
+        G.neighCounts[protagonist] = (G.neighCounts[protagonist] || 0) + 1;
         var cardWasNeighed = (G.neighDiscussion.rounds.length + 1) % 2 === 0;
         if (cardWasNeighed) {
             G.discardPile.push(G.neighDiscussion.cardID);
