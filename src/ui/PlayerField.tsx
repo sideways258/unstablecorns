@@ -173,11 +173,16 @@ const currentGlow = keyframes`
 
 const PlayerBox = styled.div<{ current: boolean }>`
     position: relative;
+    display: flex;
+    flex-direction: column;
     width: 148px;
-    height: 176px;
+    /* min-height (not a fixed height): a stable with several cards can wrap to
+       a second row - let the box grow to honestly contain it instead of the
+       content silently overflowing past a fixed box into whatever is below */
+    min-height: 176px;
     background-color: ${props => props.current ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0)"};
     border-radius: 14px;
-    margin: 0.35em;
+    margin: 0.2em;
     padding: 5px;
     animation: ${props => props.current ? css`${currentGlow} 2s ease-in-out infinite` : 'none'};
 `;
@@ -234,7 +239,7 @@ const RevealedCard = styled.div<{ image: string; color: string }>`
 `;
 
 const InnerBox = styled.div`
-    height: 100%;
+    flex: 1;
     width: 100%;
     border-radius: 12px;
     background-color: #BC4747;
@@ -263,7 +268,7 @@ const UpgradeDowngradeStable = styled.div`
     display: flex;
     flex-wrap: no-wrap;
     align-items: center;
-    margin: 0.5em 0.5em;
+    margin: 0.25em 0.5em;
 `;
 
 const UpgradeDowngradeImage = styled.img<{ image: string, isTranslucent: boolean }>`

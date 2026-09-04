@@ -5,6 +5,7 @@ import HiddenHand from './ui/HiddenHand';
 import Stable, { StableHandle } from './ui/Stable';
 import PlayerField, { PlayerFieldHandle } from './ui/PlayerField';
 import useSound from './audio';
+import { useBoardTheme } from './boardTheme';
 import { motion, AnimateSharedLayout, AnimatePresence } from "framer-motion";
 // game
 import { UnstableUnicornsGame, Ctx, _findOpenScenesWithProtagonist, Instruction, Scene, canDraw, canPlayCard, _findInProgressScenesWithProtagonist, _findInstruction, _countUnicorns } from './game/game';
@@ -94,6 +95,7 @@ type CardInteraction = {
 
 const Board = (props: any) => {
     const { G, ctx, playerID, moves } = props as Props;
+    const { theme: boardTheme } = useBoardTheme();
 
     const [playYourTurnAlert] = useSound(YourTurnSound, {
         volume: 0.3,
@@ -418,7 +420,7 @@ const Board = (props: any) => {
           )}
           {stableTargeting && showStableOf === undefined && <TargetPrompt />}
           <BoardShell>
-            <Wrapper layout onMouseMove={wrapperOnMouseMove}>
+            <Wrapper layout onMouseMove={wrapperOnMouseMove} $feltGradient={boardTheme.gradient}>
                 <div style={{ position: "absolute", right: 0, color: "rgba(0,0,0,0)", height: "20px", width: "20px" }} onClick={() => {
                     moves.end(playerID);
                     /*
@@ -1194,7 +1196,7 @@ const renderInfoLabel = (G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, 
 
 ////////////////////////////////
 
-const Wrapper = styled(motion.div)`
+const Wrapper = styled(motion.div)<{ $feltGradient?: string }>`
     width: 100%;
     height: 100%;
     position: relative;
@@ -1206,7 +1208,8 @@ const Wrapper = styled(motion.div)`
     background: transparent;
     font-family: 'Fredoka', 'Open Sans', sans-serif;
 
-    /* green felt play-mat sitting on the table (the table itself is BoardShell) */
+    /* felt play-mat sitting on the table (the table itself is BoardShell) -
+       color is a per-viewer preference, see boardTheme.tsx / Settings menu */
     &::before {
         content: '';
         position: absolute;
@@ -1214,7 +1217,8 @@ const Wrapper = styled(motion.div)`
         border-radius: 90px / 120px;
         pointer-events: none;
         z-index: 0;
-        background: radial-gradient(130% 100% at 50% 22%, #2f8267 0%, #1f5c4d 52%, #123c31 100%);
+        background: ${props => props.$feltGradient || 'radial-gradient(130% 100% at 50% 22%, #2f8267 0%, #1f5c4d 52%, #123c31 100%)'};
+        transition: background 0.3s ease;
         box-shadow:
             0 0 0 5px #2a3d34,
             0 0 0 8px rgba(212, 175, 55, 0.5),
@@ -1234,7 +1238,7 @@ const Main = styled.div`
     display: flex;
     justify-content: center;
     width: 1000px;
-    margin-top: 80px;
+    margin-top: 68px;
     z-index: 1;
 `;
 

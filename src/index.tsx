@@ -5,12 +5,15 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { LanguageContextProvider } from './LanguageContextProvider';
 import { AudioSettingsProvider } from './audio';
+import { BoardThemeProvider } from './boardTheme';
 
 ReactDOM.render(
   <React.StrictMode>
     <LanguageContextProvider>
       <AudioSettingsProvider>
-        <App />
+        <BoardThemeProvider>
+          <App />
+        </BoardThemeProvider>
       </AudioSettingsProvider>
     </LanguageContextProvider>
   </React.StrictMode>,

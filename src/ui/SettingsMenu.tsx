@@ -3,6 +3,7 @@ import { useHistory } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { COLORS, FONT_DISPLAY } from '../theme';
 import { useAudioSettings } from '../audio';
+import { useBoardTheme, BOARD_THEMES } from '../boardTheme';
 
 type Props = {
   isHost: boolean;
@@ -21,6 +22,7 @@ type Props = {
 const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }: Props) => {
   const history = useHistory();
   const { volume, muted, setVolume, toggleMuted } = useAudioSettings();
+  const { themeID, setThemeID } = useBoardTheme();
   const [open, setOpen] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -66,6 +68,21 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }:
             />
             <Percent>{Math.round((muted ? 0 : volume) * 100)}%</Percent>
           </VolumeRow>
+
+          <SectionTitle>Table color</SectionTitle>
+          <SwatchRow>
+            {BOARD_THEMES.map((t) => (
+              <SwatchButton
+                key={t.id}
+                type="button"
+                title={t.name}
+                aria-label={t.name}
+                $color={t.swatch}
+                $active={t.id === themeID}
+                onClick={() => setThemeID(t.id)}
+              />
+            ))}
+          </SwatchRow>
 
           <SectionTitle>Leave</SectionTitle>
           {!confirmLeave ? (
@@ -236,6 +253,25 @@ const MuteButton = styled.button`
   font-size: 16pt;
   cursor: pointer;
   line-height: 1;
+`;
+
+const SwatchRow = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const SwatchButton = styled.button<{ $color: string; $active: boolean }>`
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  background: ${(p) => p.$color};
+  border: 3px solid ${(p) => (p.$active ? '#fff' : 'rgba(255,255,255,0.25)')};
+  box-shadow: ${(p) => (p.$active ? '0 0 0 2px #37d9a0' : 'none')};
+  transition: transform 0.12s ease, border-color 0.12s ease;
+  &:hover {
+    transform: scale(1.1);
+  }
 `;
 
 const TimerRow = styled.div`
