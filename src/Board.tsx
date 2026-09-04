@@ -786,6 +786,22 @@ const Board = (props: any) => {
                                 }
                             }
 
+                            boardState = boardStates.find(s => (s.type === "draw__single_action_popup") && s.info?.sourceCardID === cardID);
+                            if (boardState) {
+                                const [instruction, action, scene] = _findInstruction(G, boardState.info?.instructionID)!;
+                                // this if condition is just for typescript interference
+                                if (instruction.do.key === "draw" && instruction.ui.type === "single_action_popup") {
+                                    return (
+                                        <CardPopupSingleAction
+                                            text={instruction.ui.info?.singleActionText!}
+                                            onClick={() => {
+                                                moves.executeDo(instruction.id, { protagonist: playerID, count: instruction.do.info.count });
+                                            }}
+                                        />
+                                    );
+                                }
+                            }
+
                             boardState = boardStates.find(s => (s.type === "revive") && s.info?.sourceCardID === cardID);
                             if (boardState) {
                                 const [instruction, action, scene] = _findInstruction(G, boardState.info?.instructionID)!;

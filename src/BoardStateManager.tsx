@@ -8,7 +8,7 @@ export type BoardState = {
     info?: { [key: string]: any };
 }
 
-type BoardStateKey = "playCard" | "drawCard" | "steal__cardToCard" | "destroy__cardToCard" | "destroy__click_on_card_in_stable" | "sacrifice__cardToCard" | "sacrifice__clickOnCardInStable" | "draw__clickOnDrawPile" | "endTurn" | "neigh__playNeigh" | "neigh__wait" | "discard__popup__committed" | "discard__popup__ask" | "bring__popup__committed" | "bring__popup__ask" | "discard" | "swapHands__cardToPlayer" | "shakeUp" | "move__cardToCard" | "move2__cardToPlayer" | "unicornswap1" | "unicornswap2" | "reset" | "shuffleDiscardPileIntoDrawPile" | "wait_for_other_players" | "revive" | "reviveFromNursery" | "pullRandom__cardToPlayer" | "backKick__card_to_card" | "blatantThievery1" | "addFromDiscardPileToHand__single_action_popup" | "search__single_action_popup" | "returnToHand__cardToCard" | "makeSomeoneDiscard__cardToPlayer";
+type BoardStateKey = "playCard" | "drawCard" | "steal__cardToCard" | "destroy__cardToCard" | "destroy__click_on_card_in_stable" | "sacrifice__cardToCard" | "sacrifice__clickOnCardInStable" | "draw__clickOnDrawPile" | "draw__single_action_popup" | "endTurn" | "neigh__playNeigh" | "neigh__wait" | "discard__popup__committed" | "discard__popup__ask" | "bring__popup__committed" | "bring__popup__ask" | "discard" | "swapHands__cardToPlayer" | "shakeUp" | "move__cardToCard" | "move2__cardToPlayer" | "unicornswap1" | "unicornswap2" | "reset" | "shuffleDiscardPileIntoDrawPile" | "wait_for_other_players" | "revive" | "reviveFromNursery" | "pullRandom__cardToPlayer" | "backKick__card_to_card" | "blatantThievery1" | "addFromDiscardPileToHand__single_action_popup" | "search__single_action_popup" | "returnToHand__cardToCard" | "makeSomeoneDiscard__cardToPlayer";
 
 export function getBoardState(G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID): BoardState[] {
     const openScenes = _findOpenScenesWithProtagonist(G, playerID);
@@ -165,6 +165,19 @@ function getExecutionDoState(G: UnstableUnicornsGame, ctx: Ctx, playerID: Player
                 states.push({
                     type: "draw__clickOnDrawPile",
                     info: { instructionID: instruction.id, count: instruction.do.info.count },
+                });
+            } else if (instruction.ui.type === "single_action_popup") {
+                // e.g. "you may DRAW a card" as a bare one-shot effect (Beacon
+                // Unicorn) - resolved via its own button rather than the deck,
+                // same pattern as revive/search/shakeUp.
+                states.push({
+                    type: "draw__single_action_popup",
+                    info: {
+                        instructionID: instruction.id,
+                        count: instruction.do.info.count,
+                        sourceCardID: instruction.ui.info?.source,
+                        singleActionText: instruction.ui.info?.singleActionText,
+                    },
                 });
             }
         }
