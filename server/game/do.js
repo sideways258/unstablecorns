@@ -769,11 +769,14 @@ function shakeUp(G, ctx, param) {
 }
 function reset(G, ctx, param) {
     G.players.forEach(function (pl) {
-        G.upgradeDowngradeStable[pl.id].forEach(function (cardID) {
+        // iterate a snapshot: sacrifice() reassigns upgradeDowngradeStable[pl.id]
+        // as it runs, and .forEach over that same live reference is fragile
+        __spreadArrays(G.upgradeDowngradeStable[pl.id]).forEach(function (cardID) {
             sacrifice(G, ctx, { protagonist: pl.id, cardID: cardID });
         });
     });
     G.drawPile = underscore_1["default"].shuffle(__spreadArrays(G.drawPile, G.discardPile));
+    G.discardPile = [];
 }
 function move(G, ctx, param) {
     var from = findOwnerOfCard(G, param.cardID);

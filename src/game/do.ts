@@ -1084,12 +1084,15 @@ type DoReset = {
 
 function reset(G: UnstableUnicornsGame, ctx: Ctx, param: {protagonist: PlayerID}) {
     G.players.forEach(pl => {
-        G.upgradeDowngradeStable[pl.id].forEach(cardID => {
+        // iterate a snapshot: sacrifice() reassigns upgradeDowngradeStable[pl.id]
+        // as it runs, and .forEach over that same live reference is fragile
+        [...G.upgradeDowngradeStable[pl.id]].forEach(cardID => {
             sacrifice(G, ctx, { protagonist: pl.id, cardID });
         });
     });
 
     G.drawPile = _.shuffle([...G.drawPile, ...G.discardPile]);
+    G.discardPile = [];
 }
 
 /////////////////////////////////////////////////

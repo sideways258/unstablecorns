@@ -15,6 +15,7 @@ import type { CardDefinition } from './card';
 export const EXPANSION_PACKS: { id: string; name: string; blurb: string }[] = [
   { id: 'prism', name: 'Prism Pack', blurb: '23 homebrew light-themed cards — more unicorns, upgrades and a few spells.' },
   { id: 'ruckus', name: 'Ruckus Pack', blurb: '22 homebrew chaos cards — disruptive magic and mean downgrades.' },
+  { id: 'neigh_nation', name: 'Neigh Nation', blurb: 'Adds 15 more Neigh and 5 more Super Neigh cards to the deck — chaos guaranteed.' },
 ];
 
 // --- shape helpers (loosely typed; the array below is checked as CardDefinition[]) ---
@@ -181,4 +182,11 @@ export const EXPANSION_CARDS: CardDefinition[] = [
     'This card counts as 2 Unicorns.', { passive: ['count_as_two'] }),
   card('ruckus', 'Bunker Unicorn', 'unicorn', 'chainsaw_unicorn', 2,
     'This card cannot be destroyed by Magic cards.', { passive: ['cannot_be_destroyed_by_magic'] }),
+
+  // ======================= NEIGH NATION =======================
+  // Reuses the base game's own Neigh / Super Neigh art and text - just more of them.
+  card('neigh_nation', 'Neigh', 'neigh', 'neigh', 15,
+    "Play this card when another player tries to play a card. Stop their card from being played and send it to the discard pile."),
+  card('neigh_nation', 'Super Neigh', 'super_neigh', 'super_neigh', 5,
+    "Play this card when another player tries to play a card. Stop their card from being played and send it to the discard pile. This card cannot be Neigh'd."),
 ];
