@@ -7,6 +7,7 @@ import { Screen, Panel, PanelTitle, Button } from './ui/themed';
 import BackButton from './ui/BackButton';
 import PlayerPresence from './ui/PlayerPresence';
 import SettingsMenu from './ui/SettingsMenu';
+import TurnTimer from './ui/TurnTimer';
 
 type RouteParam = {
     gameId?: string;
@@ -41,7 +42,23 @@ const GameClient = ({ debug }: Props) => {
                     <SettingsMenu
                         isHost={boardProps.playerID === '0'}
                         onEndGame={() => boardProps.moves && boardProps.moves.endMatch && boardProps.moves.endMatch()}
+                        onLeave={() =>
+                            boardProps.moves &&
+                            boardProps.moves.playerLeft &&
+                            boardProps.moves.playerLeft(boardProps.playerID)
+                        }
+                        turnTimer={
+                            boardProps.moves && boardProps.moves.setTurnTimer && boardProps.G
+                                ? boardProps.G.turnTimer
+                                : undefined
+                        }
+                        onSetTurnTimer={(patch: { enabled?: boolean; durationSec?: number }) =>
+                            boardProps.moves &&
+                            boardProps.moves.setTurnTimer &&
+                            boardProps.moves.setTurnTimer(patch)
+                        }
                     />
+                    <TurnTimer {...boardProps} />
                     <PlayerPresence {...boardProps} />
                 </>
             );

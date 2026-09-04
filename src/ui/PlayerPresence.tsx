@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { FONT_DISPLAY } from '../theme';
 
 type Seat = { id: number | string; name?: string; isConnected?: boolean };
-type Toast = { key: number; name: string; kind: 'left' | 'back' };
+type Toast = { key: number; name: string; kind: 'left' | 'back' | 'gone' };
 
 // Watches the per-seat connection info boardgame.io passes to the board and pops
 // a toast when someone drops out of / rejoins the room. Rendered once, alongside
@@ -15,6 +15,7 @@ const PlayerPresence = (props: any) => {
 
   const prev = useRef<Record<string, boolean> | null>(null);
   const everConnected = useRef<Set<string>>(new Set());
+  const prevLeft = useRef<string[] | null>(null);
   const nextKey = useRef(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -69,6 +70,28 @@ const PlayerPresence = (props: any) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, myId]);
 
+  // Permanent "left the game" (the playerLeft move), separate from a flaky
+  // connection. Once someone is in G.leftPlayers they are out for good.
+  useEffect(() => {
+    const left: string[] =
+      props.G && Array.isArray(props.G.leftPlayers) ? props.G.leftPlayers.map(String) : [];
+    if (prevLeft.current == null) {
+      prevLeft.current = left;
+      return;
+    }
+    const fresh = left
+      .filter((id) => !prevLeft.current!.includes(id) && id !== myId)
+      .map((id) => ({ key: nextKey.current++, name: nameFor(id), kind: 'gone' as const }));
+    prevLeft.current = left;
+    if (fresh.length) {
+      setToasts((t) => [...t, ...fresh]);
+      fresh.forEach((toast) => {
+        setTimeout(() => setToasts((t) => t.filter((x) => x.key !== toast.key)), 4500);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.G && props.G.leftPlayers, myId]);
+
   if (!Array.isArray(data)) return null;
 
   return (
@@ -83,11 +106,17 @@ const PlayerPresence = (props: any) => {
             exit={{ opacity: 0, y: -12, scale: 0.9 }}
             transition={{ duration: 0.22 }}
           >
-            <span role="img" aria-label={t.kind === 'left' ? 'wave' : 'plug'}>
-              {t.kind === 'left' ? '👋' : '🔌'}
+            <span role="img" aria-label={t.kind === 'back' ? 'plug' : t.kind === 'gone' ? 'door' : 'wave'}>
+              {t.kind === 'back' ? '🔌' : t.kind === 'gone' ? '🚪' : '👋'}
             </span>
             <ToastName>{t.name}</ToastName>
-            <span>{t.kind === 'left' ? 'left the room' : 'reconnected'}</span>
+            <span>
+              {t.kind === 'back'
+                ? 'reconnected'
+                : t.kind === 'gone'
+                ? 'left the game'
+                : 'left the room'}
+            </span>
           </ToastPill>
         ))}
       </AnimatePresence>
@@ -109,7 +138,7 @@ const Root = styled.div`
   pointer-events: none;
 `;
 
-const ToastPill = styled(motion.div)<{ $kind: 'left' | 'back' }>`
+const ToastPill = styled(motion.div)<{ $kind: 'left' | 'back' | 'gone' }>`
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -124,9 +153,11 @@ const ToastPill = styled(motion.div)<{ $kind: 'left' | 'back' }>`
   border: 2px solid #fff;
   box-shadow: 0 7px 0 rgba(0, 0, 0, 0.28), 0 14px 30px rgba(0, 0, 0, 0.35);
   background: ${(p) =>
-    p.$kind === 'left'
-      ? 'linear-gradient(135deg, #ff6b6b, #c81d25)'
-      : 'linear-gradient(135deg, #4ade80, #148f4b)'};
+    p.$kind === 'back'
+      ? 'linear-gradient(135deg, #4ade80, #148f4b)'
+      : p.$kind === 'gone'
+      ? 'linear-gradient(135deg, #8b5cf6, #5b21b6)'
+      : 'linear-gradient(135deg, #ff6b6b, #c81d25)'};
 
   & > span[role='img'] {
     font-size: 1.15em;

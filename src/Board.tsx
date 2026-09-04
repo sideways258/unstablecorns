@@ -340,12 +340,17 @@ const Board = (props: any) => {
         const allNames = G.players.map(p => p.name);
         if (winner !== undefined) {
             const wonName = (G.players[parseInt(winner, 10)] && G.players[parseInt(winner, 10)].name) || `Player ${winner}`;
+            const lastOneStanding = !!ctx.gameover.lastOneStanding;
             return (
                 <GameEnded
                     icon="🏆"
                     names={allNames}
                     title={winner === playerID ? 'You win! 🦄' : `${wonName} wins!`}
-                    message={`${wonName} filled their stable with ${CONSTANTS.stableSeats} unicorns.`}
+                    message={
+                        lastOneStanding
+                            ? `Everyone else left the game — ${wonName} is the last one standing.`
+                            : `${wonName} filled their stable with ${CONSTANTS.stableSeats} unicorns.`
+                    }
                 />
             );
         }
@@ -377,7 +382,7 @@ const Board = (props: any) => {
             <UpgradeDowngradeTarget
               card={G.deck[cardInteraction.info.cardID]}
               self={{ id: playerID, name: (G.players[parseInt(playerID, 10)] && G.players[parseInt(playerID, 10)].name) || `You` }}
-              others={G.players.filter(p => p.id !== playerID).map(p => ({ id: p.id, name: p.name }))}
+              others={G.players.filter(p => p.id !== playerID && (G.leftPlayers || []).indexOf(p.id) === -1).map(p => ({ id: p.id, name: p.name }))}
               onPick={(targetID) => {
                 moves.playUpgradeDowngradeCard(playerID, targetID, cardInteraction.info.cardID);
                 setCardInteraction(undefined);
@@ -507,7 +512,7 @@ const Board = (props: any) => {
                 <Main>
                     <PlayerField
                         ref={playerFieldRef}
-                        players={G.players.filter(pl => pl.id !== playerID)}
+                        players={G.players.filter(pl => pl.id !== playerID && (G.leftPlayers || []).indexOf(pl.id) === -1)}
                         currentPlayer={ctx.currentPlayer}
                         stable={_.mapObject(_.mapObject(G.stable, (val, key) => [...val, ...G.temporaryStable[key]]), c => c.map(d => G.deck[d]))}
                         handCount={G.players.map(pl => G.hand[pl.id].length)}

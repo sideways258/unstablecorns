@@ -7,12 +7,18 @@ import { useAudioSettings } from '../audio';
 type Props = {
   isHost: boolean;
   onEndGame: () => void;
+  /** Tell the game this player has left (removes their turn, stable and pending
+   *  actions) before navigating away. */
+  onLeave?: () => void;
+  /** Present only for games that support the host turn timer. */
+  turnTimer?: { enabled: boolean; durationSec: number; unlocked: boolean };
+  onSetTurnTimer?: (patch: { enabled?: boolean; durationSec?: number }) => void;
 };
 
 // Gear button (top-right of the board) that opens an on-screen settings panel.
 // Houses the master volume control, and - for the lobby host only - the
 // "end game for everyone" action.
-const SettingsMenu = ({ isHost, onEndGame }: Props) => {
+const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }: Props) => {
   const history = useHistory();
   const { volume, muted, setVolume, toggleMuted } = useAudioSettings();
   const [open, setOpen] = useState(false);
@@ -66,11 +72,56 @@ const SettingsMenu = ({ isHost, onEndGame }: Props) => {
             <GhostButton onClick={() => setConfirmLeave(true)}>Leave game</GhostButton>
           ) : (
             <>
-              <ConfirmText>Leave this game and go back to the home screen?</ConfirmText>
+              <ConfirmText>
+                Leave this game for good? Your turn, stable and hand are removed and you can't rejoin.
+              </ConfirmText>
               <ConfirmRow>
                 <GhostButton onClick={() => setConfirmLeave(false)}>Cancel</GhostButton>
-                <DangerButton onClick={() => history.push('/')}>Leave</DangerButton>
+                <DangerButton
+                  onClick={() => {
+                    if (onLeave) onLeave();
+                    history.push('/');
+                  }}
+                >
+                  Leave
+                </DangerButton>
               </ConfirmRow>
+            </>
+          )}
+
+          {isHost && turnTimer && onSetTurnTimer && (
+            <>
+              <SectionTitle>Turn timer</SectionTitle>
+              <TimerRow>
+                <ToggleButton
+                  $on={turnTimer.enabled}
+                  disabled={!turnTimer.unlocked && !turnTimer.enabled}
+                  onClick={() => onSetTurnTimer({ enabled: !turnTimer.enabled })}
+                >
+                  {turnTimer.enabled ? 'On' : 'Off'}
+                </ToggleButton>
+                <input
+                  type="range"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={Math.round(turnTimer.durationSec / 60)}
+                  onChange={(e) =>
+                    onSetTurnTimer({ durationSec: parseInt(e.target.value, 10) * 60 })
+                  }
+                  style={{ flex: 1 }}
+                />
+                <Percent>{Math.round(turnTimer.durationSec / 60)}m</Percent>
+              </TimerRow>
+              {!turnTimer.unlocked && !turnTimer.enabled && (
+                <ConfirmText>Unlocks once a turn has run over 3 minutes.</ConfirmText>
+              )}
+              {turnTimer.enabled && (
+                <ConfirmText>
+                  A turn running past {Math.round(turnTimer.durationSec / 60)} min is ended
+                  automatically.
+                </ConfirmText>
+              )}
             </>
           )}
 
@@ -185,6 +236,28 @@ const MuteButton = styled.button`
   font-size: 16pt;
   cursor: pointer;
   line-height: 1;
+`;
+
+const TimerRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const ToggleButton = styled.button<{ $on: boolean }>`
+  min-width: 52px;
+  padding: 0.4em 0.7em;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 10pt;
+  cursor: pointer;
+  border: 2px solid #fff;
+  color: #fff;
+  background: ${(p) => (p.$on ? 'linear-gradient(135deg, #37d9a0, #1f9c74)' : 'transparent')};
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 `;
 
 const Percent = styled.span`

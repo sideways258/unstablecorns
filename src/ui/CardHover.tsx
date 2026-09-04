@@ -42,8 +42,8 @@ const slideIn = keyframes`
 `;
 
 const slideIn2 = keyframes`
-    from { opacity: 0; transform: translate(-50%, -46%); }
-    to   { opacity: 1; transform: translate(-50%, -50%); }
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 `;
 
 const Dock = styled.div`
@@ -80,16 +80,22 @@ const Body = styled.div`
     word-break: break-word;
 `;
 
-/* the rare interactive accessory (e.g. a "confirm discard" popup) - centred and
-   clickable so it's still reachable now that the description is off to the side */
+/* the interactive accessory (e.g. a "Discard 2 cards" / "Activate" button).
+   Pinned just above the hand, near the cards, and stays put (it is rendered
+   whenever the effect is pending - not only while the card is hovered) so it
+   can't vanish out from under the pointer. */
 const ActionDock = styled.div`
     position: fixed;
     left: 50%;
-    top: 58%;
-    transform: translate(-50%, -50%);
+    bottom: 232px;
+    transform: translateX(-50%);
     z-index: 120001;
     pointer-events: auto;
-    animation: ${slideIn2} 0.14s ease both;
+    animation: ${slideIn2} 0.16s ease both;
+
+    @media (max-height: 620px) {
+        bottom: 180px;
+    }
 `;
 
 export default CardHover;

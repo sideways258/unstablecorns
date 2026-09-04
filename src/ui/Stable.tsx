@@ -46,6 +46,25 @@ const Stable = React.forwardRef<StableHandle, Props>((props, ref) => {
         }
     }));
 
+    // If any card in the stable has a pending "activate this effect" button, that
+    // card's panel is pinned open (independent of hover) so the button can't
+    // vanish out from under the pointer - and it is the ONLY panel shown, so we
+    // never stack two description docks on top of each other.
+    let pinnedId: CardID | undefined;
+    let pinnedNode: React.ReactElement | undefined;
+    for (const c of [...props.upgradeDowngradeCards, ...props.cards]) {
+        const a = props.renderAccessoryHoverItem(c.id);
+        if (a) {
+            pinnedId = c.id;
+            pinnedNode = a;
+            break;
+        }
+    }
+    const showPanelFor = (cardId: CardID): boolean =>
+        pinnedId !== undefined ? pinnedId === cardId : showHover === cardId;
+    const childFor = (cardId: CardID): React.ReactElement | undefined =>
+        pinnedId === cardId ? pinnedNode : undefined;
+
     return (
         <Wrapper>
             <UpgradeDowngradeSection>
@@ -56,29 +75,29 @@ const Stable = React.forwardRef<StableHandle, Props>((props, ref) => {
                 }
                 {props.upgradeDowngradeCards.map(card => {
                     return (
-                        <StableItem 
+                        <StableItem
                             key={card.id}
-                            onClick={evt => props.onStableItemClick(evt, card.id)} 
-                            ref={setItemRefs(`${card.id}`) as any} 
+                            onClick={evt => props.onStableItemClick(evt, card.id)}
+                            ref={setItemRefs(`${card.id}`) as any}
                             onMouseEnter={() => {
                                 props.onStableItemMouseEnter(card.id);
                                 setShowHover(card.id);
-                            }} 
+                            }}
                             onMouseLeave={() => {
                                 props.onStableItemMouseLeave(card.id)
                                 setShowHover(undefined);
                             }}
                         >
-                            <MiniCardImage 
+                            <MiniCardImage
                                 layoutId={`${card.id}`}
-                                src={ImageLoader.load(card.image)} 
-                                color={_typeToColor(card.type)} 
-                                isGlowing={props.glowing.includes(card.id)} 
+                                src={ImageLoader.load(card.image)}
+                                color={_typeToColor(card.type)}
+                                isGlowing={props.glowing.includes(card.id)}
                                 isTranslucent={props.highlightMode ? !props.highlightMode.includes(card.id) : false}
                             />
-                            {showHover === card.id &&
+                            {showPanelFor(card.id) &&
                                 <CardHover title={card.title} position={"bottom"} offset={{x: 45, y: 10}} color={_typeToColor(card.type)} text={cardDescription(card, context!.language)}>
-                                {props.renderAccessoryHoverItem(card.id)}
+                                {childFor(card.id)}
                                 </CardHover>
                             }
                         </StableItem>
@@ -89,29 +108,29 @@ const Stable = React.forwardRef<StableHandle, Props>((props, ref) => {
             <StableWrapper>
                 {props.cards.map((card, idx) => {
                     return (
-                        <StableItem 
-                            key={card.id} 
-                            ref={setItemRefs(`${card.id}`) as any} 
-                            onClick={evt => props.onStableItemClick(evt, card.id)} 
+                        <StableItem
+                            key={card.id}
+                            ref={setItemRefs(`${card.id}`) as any}
+                            onClick={evt => props.onStableItemClick(evt, card.id)}
                             onMouseEnter={() => {
                                 props.onStableItemMouseEnter(card.id);
                                 setShowHover(card.id);
-                            }} 
+                            }}
                             onMouseLeave={() => {
                                 props.onStableItemMouseLeave(card.id)
                                 setShowHover(undefined);
                             }}
                         >
-                            <CardImage 
+                            <CardImage
                                 layoutId={`${card.id}`}
-                                src={ImageLoader.load(card.image)} 
-                                color={_typeToColor(card.type)} 
-                                isGlowing={props.glowing.includes(card.id)} 
+                                src={ImageLoader.load(card.image)}
+                                color={_typeToColor(card.type)}
+                                isGlowing={props.glowing.includes(card.id)}
                                 isTranslucent={props.highlightMode ? !props.highlightMode.includes(card.id) : false}
                             />
-                            {showHover === card.id &&
+                            {showPanelFor(card.id) &&
                                 <CardHover title={card.title} position={"bottom"} offset={{x: 80, y: 0}} color={_typeToColor(card.type)} text={cardDescription(card, context!.language)}>
-                                {props.renderAccessoryHoverItem(card.id)}
+                                {childFor(card.id)}
                                 </CardHover>
                             }
                         </StableItem>

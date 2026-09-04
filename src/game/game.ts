@@ -31,6 +31,18 @@ export interface UnstableUnicornsGame extends Game {
     clipboard: {[key: string]: any};
     endGame: boolean;
     expansions: string[];
+    /** Seats whose player has left the game. They are skipped in the turn
+     *  order, hold no cards, and owe no actions. */
+    leftPlayers: PlayerID[];
+    /** Optional host-run turn timer. Can only be switched on once a turn has
+     *  actually run over 3 minutes (`unlocked`). When `enabled`, a turn that
+     *  runs past `durationSec` (60-300) is force-ended. */
+    turnTimer: {
+        enabled: boolean;
+        durationSec: number;
+        turnStartedAt: number | undefined;
+        unlocked: boolean;
+    };
     babyStarter: { cardID: CardID, owner: PlayerID }[];
     ready: { [key: string]: boolean };
     uiHoverHandIndex: number | undefined;
@@ -84,22 +96,30 @@ export interface Instruction {
 
 const UnstableUnicorns = {
     name: "unstable_unicorns",
-    // Win conditions: the host ends the match, OR a player reaches 7 unicorns
-    // in their stable.
+    // Win conditions: the host ends the match, a player reaches 7 unicorns in
+    // their stable, OR everyone else has left the game.
     endIf: (G: UnstableUnicornsGame, ctx: Ctx) => {
         if (G.endGame) {
             return { endedByHost: true };
         }
         if (ctx.phase === "main") {
-            for (const p of G.players) {
+            const remaining = G.players.filter(p => (G.leftPlayers || []).indexOf(p.id) === -1);
+            if (remaining.length === 0) {
+                return { draw: true };
+            }
+            if (remaining.length === 1) {
+                return { winner: remaining[0].id, lastOneStanding: true };
+            }
+            for (const p of remaining) {
                 if (_countUnicorns(G, p.id) >= CONSTANTS.stableSeats) {
                     return { winner: p.id };
                 }
             }
         }
     },
-    // Available in every phase/stage so the host can always bail out.
-    moves: { endMatch },
+    // Available in every phase/stage so the host can always bail out, any player
+    // can drop out, and the turn timer keeps working.
+    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout },
     setup: (ctx: Ctx, setupData: any): UnstableUnicornsGame => {
         const funny = funnyNames(ctx.numPlayers);
         const players: Player[] = Array.from({ length: ctx.numPlayers }, (val, idx) => {
@@ -147,6 +167,8 @@ const UnstableUnicorns = {
             clipboard: {},
             endGame: false,
             expansions: [],
+            leftPlayers: [],
+            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false },
             babyStarter: [],
             ready,
             uiHoverHandIndex: undefined,
@@ -170,10 +192,37 @@ const UnstableUnicorns = {
         }
     },
     turn: {
+        // Skip any seat whose player has left the game.
+        order: {
+            first: (G: UnstableUnicornsGame, ctx: Ctx) => {
+                for (let pos = 0; pos < ctx.numPlayers; pos++) {
+                    if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
+                        return pos;
+                    }
+                }
+                return 0;
+            },
+            next: (G: UnstableUnicornsGame, ctx: Ctx) => {
+                let pos = ctx.playOrderPos;
+                for (let i = 0; i < ctx.numPlayers; i++) {
+                    pos = (pos + 1) % ctx.numPlayers;
+                    if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
+                        return pos;
+                    }
+                }
+                return ctx.playOrderPos;
+            },
+        },
         onBegin: (G: UnstableUnicornsGame, ctx: Ctx) => {
             if (ctx.phase === "pregame") {
                 return;
             }
+
+            // stamp when this turn started so the (optional) turn timer can run
+            if (!G.turnTimer) {
+                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+            }
+            G.turnTimer.turnStartedAt = Date.now();
 
             // this is run whenever a new player starts its turn
             // perfect for placing players in a stage
@@ -218,16 +267,24 @@ const UnstableUnicorns = {
                 ctx.events?.setPhase!("end");
             }
         },
+        onEnd: (G: UnstableUnicornsGame, ctx: Ctx) => {
+            // Once any turn actually runs over 3 minutes, the host is allowed to
+            // switch the turn timer on.
+            if (G.turnTimer && G.turnTimer.turnStartedAt &&
+                (Date.now() - G.turnTimer.turnStartedAt) > 180000) {
+                G.turnTimer.unlocked = true;
+            }
+        },
         stages: {
             pregame: {
-                moves: { ready, selectBaby, changeName, endMatch, setExpansions }
+                moves: { ready, selectBaby, changeName, endMatch, setExpansions, playerLeft, setTurnTimer, forceEndTurnOnTimeout }
             },
             beginning: {
-                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch }
+                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout }
             },
             action_phase: {
                 moves: {
-                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch
+                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout
                 }
             }
         }
@@ -280,12 +337,23 @@ function changeName(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, na
 
 const UNICORN_TYPES = ["baby", "basic", "unicorn", "narwhal"];
 
+// Players still in the game (everyone who has not left). Use this anywhere the
+// game waits on "every player" so a seat that left never stalls a scene or a
+// neigh vote.
+export function _activePlayers(G: UnstableUnicornsGame): Player[] {
+    return G.players.filter(p => (G.leftPlayers || []).indexOf(p.id) === -1);
+}
+
 // Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all
 // count). A card counts twice if it has the "count_as_two" passive OR it granted
 // the player a "count_as_two" effect on entering (e.g. Ginormous Unicorn).
-// Reaching CONSTANTS.stableSeats (7) wins.
+// If the player has "pandamonium" active, every Unicorn in their Stable is a
+// Panda instead and none of them count. Reaching CONSTANTS.stableSeats (7) wins.
 export function _countUnicorns(G: UnstableUnicornsGame, playerID: PlayerID): number {
     const effects = G.playerEffects[playerID] || [];
+    if (effects.some(e => e.effect && e.effect.key === "pandamonium")) {
+        return 0;
+    }
     return (G.stable[playerID] || []).reduce((sum, cardID) => {
         const card = G.deck[cardID];
         if (!card || UNICORN_TYPES.indexOf(card.type) === -1) {
@@ -306,6 +374,102 @@ function endMatch(G: UnstableUnicornsGame, ctx: Ctx) {
     G.endGame = true;
 }
 
+// A player leaves for good. Their turn, their cards, and every action they still
+// owe are removed so the game never stalls waiting on someone who is gone. The
+// turn order (see turn.order) skips them from here on, and endIf ends the game
+// once only one player is left.
+function playerLeft(G: UnstableUnicornsGame, ctx: Ctx, leaverID?: PlayerID) {
+    const pid: PlayerID | undefined =
+        leaverID !== undefined && leaverID !== null ? String(leaverID) : (ctx.playerID as PlayerID | undefined);
+    if (pid === undefined || G.players.find(p => p.id === pid) === undefined) {
+        return INVALID_MOVE;
+    }
+    // You can only remove yourself from the game.
+    if (ctx.playerID != null && pid !== String(ctx.playerID)) {
+        return INVALID_MOVE;
+    }
+    if (G.leftPlayers.indexOf(pid) !== -1) {
+        return; // already gone
+    }
+
+    G.leftPlayers = [...G.leftPlayers, pid];
+
+    // 1. Their cards leave play. Baby unicorns go back to the Nursery (their
+    //    printed rule), everything else to the discard pile.
+    const dump = (ids: CardID[]) => {
+        (ids || []).forEach(cardID => {
+            const card = G.deck[cardID];
+            if (card && card.type === "baby") {
+                G.nursery.push(cardID);
+            } else if (card) {
+                G.discardPile.push(cardID);
+            }
+        });
+    };
+    dump(G.stable[pid]);
+    dump(G.temporaryStable[pid]);
+    dump(G.upgradeDowngradeStable[pid]);
+    dump(G.hand[pid]);
+    G.stable[pid] = [];
+    G.temporaryStable[pid] = [];
+    G.upgradeDowngradeStable[pid] = [];
+    G.hand[pid] = [];
+    G.playerEffects[pid] = [];
+    G.ready[pid] = true; // never block a lobby that is waiting on "everyone ready"
+
+    // 2. Drop every instruction that still needs the leaver so no scene waits on
+    //    them, then discard any scene that is now fully resolved.
+    G.script.scenes.forEach(scene => {
+        scene.actions.forEach(action => {
+            action.instructions.forEach(ins => {
+                if (ins.protagonist === pid && ins.state !== "executed") {
+                    ins.state = "executed";
+                }
+            });
+        });
+    });
+    G.script.scenes = G.script.scenes.filter(scene =>
+        scene.actions.some(action =>
+            action.instructions.some(ins => ins.state !== "executed")
+        )
+    );
+
+    // 3. A neigh discussion cannot wait on a player who left.
+    if (G.neighDiscussion) {
+        if (G.neighDiscussion.protagonist === pid || G.neighDiscussion.target === pid) {
+            // The card in question just fizzles onto the discard pile.
+            G.discardPile.push(G.neighDiscussion.cardID);
+            G.neighDiscussion = undefined;
+        } else {
+            G.neighDiscussion.rounds.forEach(round => {
+                if (round.playerState[pid]) {
+                    delete round.playerState[pid];
+                }
+            });
+        }
+    }
+
+    // 4. Clear UI interaction state that might have pointed at them.
+    G.uiCardToCard = undefined;
+    G.uiExecuteDo = undefined;
+
+    // 5. If it was their turn, move on immediately.
+    if (ctx.phase !== "pregame" && ctx.currentPlayer === pid) {
+        ctx.events?.endTurn!();
+    }
+
+    // 6. In the lobby, don't let their un-readied seat hold the game hostage:
+    //    if every remaining player is ready (and has a baby), start.
+    if (ctx.phase === "pregame") {
+        const remaining = _activePlayers(G);
+        if (remaining.length >= 2 &&
+            remaining.every(p => G.ready[p.id] === true && G.babyStarter.find(s => s.owner === p.id))) {
+            initializeGame(G, ctx);
+            ctx.events?.setPhase!("main");
+        }
+    }
+}
+
 function ready(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
     G.ready[protagonist] = true;
 
@@ -313,6 +477,69 @@ function ready(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
         initializeGame(G, ctx);
         ctx.events?.setPhase!("main");
     }
+}
+
+const TIMER_MIN_SEC = 60;
+const TIMER_MAX_SEC = 300;
+
+// Host-only (seat 0). Adjust the turn-timer duration any time; only switch it on
+// once a turn has already run over 3 minutes (turnTimer.unlocked).
+function setTurnTimer(G: UnstableUnicornsGame, ctx: Ctx, patch: { enabled?: boolean; durationSec?: number }) {
+    if (String(ctx.playerID) !== "0" || (G.leftPlayers || []).indexOf("0") !== -1) {
+        return INVALID_MOVE;
+    }
+    if (!G.turnTimer) {
+        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+    }
+    if (patch && typeof patch.durationSec === "number" && isFinite(patch.durationSec)) {
+        G.turnTimer.durationSec = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, Math.round(patch.durationSec)));
+    }
+    if (patch && typeof patch.enabled === "boolean") {
+        if (patch.enabled && !G.turnTimer.unlocked) {
+            return INVALID_MOVE;
+        }
+        G.turnTimer.enabled = patch.enabled;
+    }
+}
+
+// Any player may call this once the current turn has run past the timer. Guarded
+// so it is a no-op unless the timer is really enabled and really expired; the
+// current player's pending actions are cleared so the turn can actually end.
+function forceEndTurnOnTimeout(G: UnstableUnicornsGame, ctx: Ctx) {
+    const t = G.turnTimer;
+    if (!t || !t.enabled || !t.turnStartedAt || ctx.phase === "pregame") {
+        return INVALID_MOVE;
+    }
+    if (Date.now() - t.turnStartedAt < t.durationSec * 1000) {
+        return INVALID_MOVE;
+    }
+
+    const pid = ctx.currentPlayer;
+
+    // clear anything the slow player still owes so the turn can end cleanly
+    G.script.scenes.forEach(scene => {
+        scene.actions.forEach(action => {
+            action.instructions.forEach(ins => {
+                if (ins.protagonist === pid && ins.state !== "executed") {
+                    ins.state = "executed";
+                }
+            });
+        });
+    });
+    G.script.scenes = G.script.scenes.filter(scene =>
+        scene.actions.some(action =>
+            action.instructions.some(ins => ins.state !== "executed")
+        )
+    );
+    if (G.neighDiscussion) {
+        G.discardPile.push(G.neighDiscussion.cardID);
+        G.neighDiscussion = undefined;
+    }
+    G.uiCardToCard = undefined;
+    G.uiExecuteDo = undefined;
+    G.mustEndTurnImmediately = false;
+
+    ctx.events?.endTurn!();
 }
 
 function selectBaby(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, cardID: CardID) {
@@ -350,7 +577,7 @@ function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, card
         G.neighDiscussion = {
             cardID, protagonist, rounds: [{
                 state: "open",
-                playerState: Object.fromEntries(G.players.map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
+                playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
             }],
             target: protagonist,
         };
@@ -368,7 +595,7 @@ function playUpgradeDowngradeCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist
         G.neighDiscussion = {
             cardID, protagonist, rounds: [{
                 state: "open",
-                playerState: Object.fromEntries(G.players.map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]))),
+                playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]))),
             }],
             target: targetPlayer,
         };
@@ -392,7 +619,7 @@ function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonis
         round.state = "neigh";
         G.neighDiscussion.rounds.push({
             state: "open",
-            playerState: Object.fromEntries(G.players.map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
+            playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
         });
     }
 }
@@ -601,7 +828,7 @@ export function _addSceneFromDo(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardI
                         if (c.protagonist === "owner") {
                             protagonists.push(owner);
                         } else if (c.protagonist === "all") {
-                            protagonists = G.players.map(pl => pl.id);
+                            protagonists = _activePlayers(G).map(pl => pl.id);
                         }
 
                         protagonists.forEach(pid => {

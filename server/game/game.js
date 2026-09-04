@@ -28,23 +28,31 @@ var core_1 = require("boardgame.io/core");
 var funnyNames_1 = require("../funnyNames");
 var UnstableUnicorns = {
     name: "unstable_unicorns",
-    // Win conditions: the host ends the match, OR a player reaches 7 unicorns
-    // in their stable.
+    // Win conditions: the host ends the match, a player reaches 7 unicorns in
+    // their stable, OR everyone else has left the game.
     endIf: function (G, ctx) {
         if (G.endGame) {
             return { endedByHost: true };
         }
         if (ctx.phase === "main") {
-            for (var i = 0; i < G.players.length; i++) {
-                var p = G.players[i];
+            var remaining = G.players.filter(function (p) { return (G.leftPlayers || []).indexOf(p.id) === -1; });
+            if (remaining.length === 0) {
+                return { draw: true };
+            }
+            if (remaining.length === 1) {
+                return { winner: remaining[0].id, lastOneStanding: true };
+            }
+            for (var i = 0; i < remaining.length; i++) {
+                var p = remaining[i];
                 if (_countUnicorns(G, p.id) >= constants_1.CONSTANTS.stableSeats) {
                     return { winner: p.id };
                 }
             }
         }
     },
-    // Available in every phase/stage so the host can always bail out.
-    moves: { endMatch: endMatch },
+    // Available in every phase/stage so the host can always bail out, any player
+    // can drop out, and the turn timer keeps working.
+    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout },
     setup: function (ctx, setupData) {
         var funny = funnyNames_1.funnyNames(ctx.numPlayers);
         var players = Array.from({ length: ctx.numPlayers }, function (val, idx) {
@@ -89,6 +97,8 @@ var UnstableUnicorns = {
             clipboard: {},
             endGame: false,
             expansions: [],
+            leftPlayers: [],
+            turnTimer: { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false },
             babyStarter: [],
             ready: ready,
             uiHoverHandIndex: undefined,
@@ -112,11 +122,37 @@ var UnstableUnicorns = {
         }
     },
     turn: {
+        // Skip any seat whose player has left the game.
+        order: {
+            first: function (G, ctx) {
+                for (var pos = 0; pos < ctx.numPlayers; pos++) {
+                    if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
+                        return pos;
+                    }
+                }
+                return 0;
+            },
+            next: function (G, ctx) {
+                var pos = ctx.playOrderPos;
+                for (var i = 0; i < ctx.numPlayers; i++) {
+                    pos = (pos + 1) % ctx.numPlayers;
+                    if ((G.leftPlayers || []).indexOf(ctx.playOrder[pos]) === -1) {
+                        return pos;
+                    }
+                }
+                return ctx.playOrderPos;
+            }
+        },
         onBegin: function (G, ctx) {
             var _a, _b;
             if (ctx.phase === "pregame") {
                 return;
             }
+            // stamp when this turn started so the (optional) turn timer can run
+            if (!G.turnTimer) {
+                G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+            }
+            G.turnTimer.turnStartedAt = Date.now();
             // this is run whenever a new player starts its turn
             // perfect for placing players in a stage
             if (G.drawPile.length > 0) {
@@ -157,16 +193,24 @@ var UnstableUnicorns = {
                 (_b = ctx.events) === null || _b === void 0 ? void 0 : _b.setPhase("end");
             }
         },
+        onEnd: function (G, ctx) {
+            // Once any turn actually runs over 3 minutes, the host is allowed to
+            // switch the turn timer on.
+            if (G.turnTimer && G.turnTimer.turnStartedAt &&
+                (Date.now() - G.turnTimer.turnStartedAt) > 180000) {
+                G.turnTimer.unlocked = true;
+            }
+        },
         stages: {
             pregame: {
-                moves: { ready: ready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions }
+                moves: { ready: ready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout }
             },
             beginning: {
-                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch }
+                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout }
             },
             action_phase: {
                 moves: {
-                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch
+                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout
                 }
             }
         }
@@ -211,11 +255,21 @@ function setExpansions(G, ctx, sets) {
     G.expansions = Array.isArray(sets) ? sets.filter(function (s) { return typeof s === "string"; }) : [];
 }
 var UNICORN_TYPES = ["baby", "basic", "unicorn", "narwhal"];
+// Players still in the game (everyone who has not left). Use this anywhere the
+// game waits on "every player" so a seat that left never stalls a scene or vote.
+function _activePlayers(G) {
+    return G.players.filter(function (p) { return (G.leftPlayers || []).indexOf(p.id) === -1; });
+}
 // Number of unicorns in a player's stable (Baby / Basic / Magical / Narwhal all
 // count). A card counts twice if it has the "count_as_two" passive OR it granted
-// the player a "count_as_two" effect on entering (e.g. Ginormous Unicorn). 7 wins.
+// the player a "count_as_two" effect on entering (e.g. Ginormous Unicorn).
+// If the player has "pandamonium" active, every Unicorn in their Stable is a
+// Panda instead and none of them count. 7 wins.
 function _countUnicorns(G, playerID) {
     var effects = G.playerEffects[playerID] || [];
+    if (effects.some(function (e) { return e.effect && e.effect.key === "pandamonium"; })) {
+        return 0;
+    }
     return (G.stable[playerID] || []).reduce(function (sum, cardID) {
         var card = G.deck[cardID];
         if (!card || UNICORN_TYPES.indexOf(card.type) === -1) {
@@ -233,6 +287,93 @@ function endMatch(G, ctx) {
     }
     G.endGame = true;
 }
+// A player leaves for good. Their turn, their cards, and every action they still
+// owe are removed so the game never stalls waiting on someone who is gone.
+function playerLeft(G, ctx, leaverID) {
+    var _a;
+    var pid = (leaverID !== undefined && leaverID !== null) ? String(leaverID) : ctx.playerID;
+    if (pid === undefined || G.players.find(function (p) { return p.id === pid; }) === undefined) {
+        return core_1.INVALID_MOVE;
+    }
+    // You can only remove yourself from the game.
+    if (ctx.playerID != null && pid !== String(ctx.playerID)) {
+        return core_1.INVALID_MOVE;
+    }
+    if (G.leftPlayers.indexOf(pid) !== -1) {
+        return; // already gone
+    }
+    G.leftPlayers = __spreadArrays(G.leftPlayers, [pid]);
+    // 1. Their cards leave play. Baby unicorns go back to the Nursery, everything
+    //    else to the discard pile.
+    var dump = function (ids) {
+        (ids || []).forEach(function (cardID) {
+            var card = G.deck[cardID];
+            if (card && card.type === "baby") {
+                G.nursery.push(cardID);
+            }
+            else if (card) {
+                G.discardPile.push(cardID);
+            }
+        });
+    };
+    dump(G.stable[pid]);
+    dump(G.temporaryStable[pid]);
+    dump(G.upgradeDowngradeStable[pid]);
+    dump(G.hand[pid]);
+    G.stable[pid] = [];
+    G.temporaryStable[pid] = [];
+    G.upgradeDowngradeStable[pid] = [];
+    G.hand[pid] = [];
+    G.playerEffects[pid] = [];
+    G.ready[pid] = true; // never block a lobby that is waiting on "everyone ready"
+    // 2. Drop every instruction that still needs the leaver, then discard any
+    //    scene that is now fully resolved.
+    G.script.scenes.forEach(function (scene) {
+        scene.actions.forEach(function (action) {
+            action.instructions.forEach(function (ins) {
+                if (ins.protagonist === pid && ins.state !== "executed") {
+                    ins.state = "executed";
+                }
+            });
+        });
+    });
+    G.script.scenes = G.script.scenes.filter(function (scene) {
+        return scene.actions.some(function (action) {
+            return action.instructions.some(function (ins) { return ins.state !== "executed"; });
+        });
+    });
+    // 3. A neigh discussion cannot wait on a player who left.
+    if (G.neighDiscussion) {
+        if (G.neighDiscussion.protagonist === pid || G.neighDiscussion.target === pid) {
+            G.discardPile.push(G.neighDiscussion.cardID);
+            G.neighDiscussion = undefined;
+        }
+        else {
+            G.neighDiscussion.rounds.forEach(function (round) {
+                if (round.playerState[pid]) {
+                    delete round.playerState[pid];
+                }
+            });
+        }
+    }
+    // 4. Clear UI interaction state that might have pointed at them.
+    G.uiCardToCard = undefined;
+    G.uiExecuteDo = undefined;
+    // 5. If it was their turn, move on immediately.
+    if (ctx.phase !== "pregame" && ctx.currentPlayer === pid) {
+        (_a = ctx.events) === null || _a === void 0 ? void 0 : _a.endTurn();
+    }
+    // 6. In the lobby, don't let their un-readied seat hold the game hostage.
+    if (ctx.phase === "pregame") {
+        var remaining = _activePlayers(G);
+        if (remaining.length >= 2 && remaining.every(function (p) {
+            return G.ready[p.id] === true && G.babyStarter.find(function (s) { return s.owner === p.id; });
+        })) {
+            initializeGame(G, ctx);
+            (_a = ctx.events) === null || _a === void 0 ? void 0 : _a.setPhase("main");
+        }
+    }
+}
 function ready(G, ctx, protagonist) {
     var _a;
     G.ready[protagonist] = true;
@@ -248,6 +389,61 @@ function selectBaby(G, ctx, protagonist, cardID) {
         cardID: cardID,
         owner: protagonist
     });
+}
+var TIMER_MIN_SEC = 60;
+var TIMER_MAX_SEC = 300;
+// Host-only (seat 0). Adjust duration any time; only switch it on once a turn
+// has already run over 3 minutes (turnTimer.unlocked).
+function setTurnTimer(G, ctx, patch) {
+    if (String(ctx.playerID) !== "0" || (G.leftPlayers || []).indexOf("0") !== -1) {
+        return core_1.INVALID_MOVE;
+    }
+    if (!G.turnTimer) {
+        G.turnTimer = { enabled: false, durationSec: 120, turnStartedAt: undefined, unlocked: false };
+    }
+    if (patch && typeof patch.durationSec === "number" && isFinite(patch.durationSec)) {
+        G.turnTimer.durationSec = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, Math.round(patch.durationSec)));
+    }
+    if (patch && typeof patch.enabled === "boolean") {
+        if (patch.enabled && !G.turnTimer.unlocked) {
+            return core_1.INVALID_MOVE;
+        }
+        G.turnTimer.enabled = patch.enabled;
+    }
+}
+// Any player may call this once the current turn has run past the timer.
+function forceEndTurnOnTimeout(G, ctx) {
+    var _a;
+    var t = G.turnTimer;
+    if (!t || !t.enabled || !t.turnStartedAt || ctx.phase === "pregame") {
+        return core_1.INVALID_MOVE;
+    }
+    if (Date.now() - t.turnStartedAt < t.durationSec * 1000) {
+        return core_1.INVALID_MOVE;
+    }
+    var pid = ctx.currentPlayer;
+    G.script.scenes.forEach(function (scene) {
+        scene.actions.forEach(function (action) {
+            action.instructions.forEach(function (ins) {
+                if (ins.protagonist === pid && ins.state !== "executed") {
+                    ins.state = "executed";
+                }
+            });
+        });
+    });
+    G.script.scenes = G.script.scenes.filter(function (scene) {
+        return scene.actions.some(function (action) {
+            return action.instructions.some(function (ins) { return ins.state !== "executed"; });
+        });
+    });
+    if (G.neighDiscussion) {
+        G.discardPile.push(G.neighDiscussion.cardID);
+        G.neighDiscussion = undefined;
+    }
+    G.uiCardToCard = undefined;
+    G.uiExecuteDo = undefined;
+    G.mustEndTurnImmediately = false;
+    (_a = ctx.events) === null || _a === void 0 ? void 0 : _a.endTurn();
 }
 function drawAndAdvance(G, ctx) {
     var _a;
@@ -274,7 +470,7 @@ function playCard(G, ctx, protagonist, cardID) {
         G.neighDiscussion = {
             cardID: cardID, protagonist: protagonist, rounds: [{
                     state: "open",
-                    playerState: Object.fromEntries(G.players.map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
+                    playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
                 }],
             target: protagonist
         };
@@ -291,7 +487,7 @@ function playUpgradeDowngradeCard(G, ctx, protagonist, targetPlayer, cardID) {
         G.neighDiscussion = {
             cardID: cardID, protagonist: protagonist, rounds: [{
                     state: "open",
-                    playerState: Object.fromEntries(G.players.map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
+                    playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
                 }],
             target: targetPlayer
         };
@@ -313,7 +509,7 @@ function playNeigh(G, ctx, cardID, protagonist, roundIndex) {
         round.state = "neigh";
         G.neighDiscussion.rounds.push({
             state: "open",
-            playerState: Object.fromEntries(G.players.map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
+            playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
         });
     }
 }
@@ -503,7 +699,7 @@ function _addSceneFromDo(G, ctx, cardID, owner, trigger) {
                             protagonists.push(owner);
                         }
                         else if (c.protagonist === "all") {
-                            protagonists = G.players.map(function (pl) { return pl.id; });
+                            protagonists = _activePlayers(G).map(function (pl) { return pl.id; });
                         }
                         protagonists.forEach(function (pid) {
                             instructions.push({
