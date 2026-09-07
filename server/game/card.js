@@ -13,6 +13,10 @@ var __assign = (this && this.__assign) || function () {
 exports.__esModule = true;
 exports.isUnicorn = exports.initializeDeck = void 0;
 var expansions_1 = require("./expansions");
+// Runtime-editable expansion packs uploaded through the admin panel.
+var customExpansions_1;
+try { customExpansions_1 = require("../customExpansions"); }
+catch (e) { customExpansions_1 = { buildCustomCardDefs: function () { return []; } }; }
 var Cards = [{
         title: "Baby Unicorn",
         type: "baby",
@@ -1880,7 +1884,7 @@ function initializeDeck(enabledSets) {
     var deck = [];
     var defs = Cards.concat(expansions_1.EXPANSION_CARDS.filter(function (c) {
         return c.set && enabledSets.indexOf(c.set) !== -1;
-    }));
+    })).concat(customExpansions_1.buildCustomCardDefs(enabledSets));
     defs.forEach(function (c) {
         for (var i = 0; i < c.count; i++) {
             deck.push({

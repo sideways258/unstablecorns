@@ -11,6 +11,9 @@
 # production
 /build
 
+# admin panel runtime state (custom expansion packs, uploads, admin login)
+/data
+
 # misc
 .DS_Store
 .env.local

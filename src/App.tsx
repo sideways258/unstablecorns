@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import Client from './Client';
 import Landing from './Landing';
 import JoinResolver from './JoinResolver';
+import AdminPanel from './AdminPanel';
 import { ThemeFX } from './ui/themed';
 
 const App = () => {
@@ -23,6 +24,9 @@ const App = () => {
           {/* /:gameId/:matchID/:numPlayers - old invite links: auto-assign a seat */}
           <Route exact path="/:gameId/:matchID/:numPlayers">
             <JoinResolver />
+          </Route>
+          <Route exact path="/admin">
+            <AdminPanel />
           </Route>
           <Route exact path="/">
             <Landing />

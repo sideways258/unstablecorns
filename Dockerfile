@@ -27,6 +27,10 @@ FROM node:18-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8090
+# Admin panel state (login + custom expansion packs + uploaded art). Mount this
+# as a volume (see docker-compose.yml) so it survives container re-creation.
+ENV DATA_DIR=/data
+VOLUME ["/data"]
 
 # Reuse the dependency tree from the build stage (server.js only needs
 # boardgame.io / koa-static / underscore, all present here).

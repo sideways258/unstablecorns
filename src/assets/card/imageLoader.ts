@@ -15,6 +15,11 @@ const ImageLoader = {
         if (key === "back" || !key) {
             return BACK;
         }
+        // Custom cards uploaded through the admin panel store their art as a
+        // server URL ("/uploads/..") rather than a bundled key - use it as-is.
+        if (key.charAt(0) === "/" || /^https?:\/\//i.test(key)) {
+            return key;
+        }
         try {
             // dynamic require: unknown keys throw at runtime -> fall back to the card back
             return require(`./square/${key}.png`).default;

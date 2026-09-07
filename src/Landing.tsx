@@ -147,11 +147,30 @@ const Landing = () => {
           </Row>
         </form>
       </WidePanel>
+      <AdminLink onClick={() => history.push('/admin')}>Admin</AdminLink>
     </Screen>
   );
 };
 
 // --- styles --------------------------------------------------------------
+
+const AdminLink = styled.button`
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  background: none;
+  border: none;
+  color: ${COLORS.textMuted};
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+  &:hover {
+    opacity: 1;
+  }
+`;
 
 const Hero = styled.div`
   display: flex;

@@ -41,7 +41,11 @@ var path = require("path");
 var serve = require('koa-static');
 var Server = require('boardgame.io/server').Server;
 var games_1 = require("./games");
+var admin_1 = require("./admin");
 var server = Server({ games: games_1.games });
+// Admin panel API + uploaded card art. Mounted BEFORE the static handler so
+// /api/* and /uploads/* are answered here and never fall through to the SPA.
+admin_1.mount(server.app);
 // Single listening port for everything: static front-end, game WebSocket, and
 // the boardgame.io lobby REST API are all mounted on this one server. Do NOT
 // set lobbyConfig.apiPort here -- that forks the lobby API onto a second port,

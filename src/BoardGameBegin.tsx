@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import ImageLoader from './assets/card/imageLoader';
 import { Card } from './game/card';
@@ -34,6 +34,30 @@ const BoardGameBegin = (props: Props) => {
 
     const isHost = String(props.playerID) === '0';
     const enabledExpansions = props.G.expansions || [];
+
+    // Custom expansion packs created in the admin panel (served by the game
+    // server), merged in alongside the built-in ones.
+    const [customPacks, setCustomPacks] = useState<{ id: string; name: string; blurb: string }[]>([]);
+    useEffect(() => {
+        let alive = true;
+        fetch('/api/expansions')
+            .then((r) => (r.ok ? r.json() : { packs: [] }))
+            .then((d) => {
+                if (!alive) return;
+                setCustomPacks(
+                    (d.packs || []).map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        blurb: p.blurb || `${p.cardCount || 0} custom cards`,
+                    }))
+                );
+            })
+            .catch(() => undefined);
+        return () => {
+            alive = false;
+        };
+    }, []);
+    const allExpansionPacks = [...EXPANSION_PACKS, ...customPacks];
     const toggleExpansion = (id: string, on: boolean) => {
         const next = on
             ? enabledExpansions.concat([id])
@@ -75,7 +99,7 @@ const BoardGameBegin = (props: Props) => {
                 setNameSaved(true);
             }}
             nameSaved={nameSaved}
-            expansionPacks={EXPANSION_PACKS}
+            expansionPacks={allExpansionPacks}
             enabledExpansions={enabledExpansions}
             isHost={isHost}
             onToggleExpansion={toggleExpansion}

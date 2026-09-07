@@ -6,8 +6,15 @@ services:
     restart: unless-stopped
     environment:
       - PORT=8090
+      - DATA_DIR=/data
     ports:
       - "8090:8090"   # host 8090 -> container 8090; change the left number to use a different host port
+    volumes:
+      # Persists admin login + custom expansion packs + uploaded card art.
+      # Without this, anything added in the admin panel is lost when the
+      # container is recreated (e.g. on image update). On Unraid point the left
+      # side at appdata, e.g. /mnt/user/appdata/unstablecorns.
+      - ./data:/data
     # The game's multiplayer uses WebSockets on this same port -- if you put this
     # behind a reverse proxy, make sure it forwards Upgrade/Connection headers.
 
