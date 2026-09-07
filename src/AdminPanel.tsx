@@ -12,6 +12,8 @@ import {
   isAuthError,
   readFileAsDataUrl,
   CARD_TYPE_LABELS,
+  AbilityCatalog,
+  AbilitySpec,
   BaseCard,
   EffectOption,
   StoredPack,
@@ -97,6 +99,7 @@ const AdminPanel = () => {
   const [effects, setEffects] = useState<EffectOption[]>([]);
   const [cardTypes, setCardTypes] = useState<string[]>([]);
   const [baseCards, setBaseCards] = useState<BaseCard[]>([]);
+  const [abilityCatalog, setAbilityCatalog] = useState<AbilityCatalog | null>(null);
 
   const refresh = useCallback(async () => {
     const [state, eff] = await Promise.all([adminApi.state(), adminApi.effects()]);
@@ -104,10 +107,14 @@ const AdminPanel = () => {
     setEffects(eff.effects || []);
     setCardTypes(eff.cardTypes || []);
     setView(state.mustChangePassword ? 'change-password' : 'dashboard');
-    // catalog of implemented cards (best-effort; not fatal if it fails)
+    // best-effort side catalogs (not fatal if they fail)
     adminApi
       .baseCards()
       .then((r) => setBaseCards(r.cards || []))
+      .catch(() => undefined);
+    adminApi
+      .abilityCatalog()
+      .then((r) => setAbilityCatalog(r))
       .catch(() => undefined);
   }, []);
 
@@ -335,6 +342,7 @@ const AdminPanel = () => {
             effects={effects}
             cardTypes={cardTypes}
             baseCards={baseCards}
+            abilityCatalog={abilityCatalog}
             onChanged={guardedRefresh}
             onError={(m) => setError(m)}
           />
@@ -388,6 +396,7 @@ const PackCard = ({
   effects,
   cardTypes,
   baseCards,
+  abilityCatalog,
   onChanged,
   onError,
 }: {
@@ -395,6 +404,7 @@ const PackCard = ({
   effects: EffectOption[];
   cardTypes: string[];
   baseCards: BaseCard[];
+  abilityCatalog: AbilityCatalog | null;
   onChanged: () => void;
   onError: (m: string) => void;
 }) => {
@@ -442,7 +452,9 @@ const PackCard = ({
                 <span>
                   {CARD_TYPE_LABELS[c.type] || c.type} · ×{c.count}
                 </span>
-                {c.baseCardTitle ? (
+                {c.ability ? (
+                  <EffTag>custom ability</EffTag>
+                ) : c.baseCardTitle ? (
                   <EffTag>plays as {c.baseCardTitle}</EffTag>
                 ) : c.effectKey && c.effectKey !== 'none' ? (
                   <EffTag>{effects.find((e) => e.key === c.effectKey)?.label || c.effectKey}</EffTag>
@@ -483,6 +495,7 @@ const PackCard = ({
           effects={effects}
           cardTypes={cardTypes}
           baseCards={baseCards}
+          abilityCatalog={abilityCatalog}
           onAdded={onChanged}
           onError={onError}
         />
@@ -511,6 +524,7 @@ const AddCardForm = ({
   effects: EffectOption[];
   cardTypes: string[];
   baseCards: BaseCard[];
+  abilityCatalog: AbilityCatalog | null;
   onAdded: () => void;
   onError: (m: string) => void;
 }) => {
@@ -520,8 +534,22 @@ const AddCardForm = ({
   const [description, setDescription] = useState('');
   const [effectKey, setEffectKey] = useState('none');
   const [baseCardTitle, setBaseCardTitle] = useState('');
+  const [behaviour, setBehaviour] = useState<'simple' | 'custom'>('simple');
+  const [ability, setAbility] = useState<AbilitySpec>({
+    mode: 'builder',
+    trigger: 'enter',
+    mandatory: true,
+    steps: [],
+    effects: [],
+  });
   const [imageData, setImageData] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const abilityIsEmpty =
+    behaviour !== 'custom' ||
+    (ability.mode === 'builder'
+      ? (ability.steps || []).length === 0 && (ability.effects || []).length === 0
+      : !(ability.onJson || '').trim() && !(ability.passiveJson || '').trim());
 
   const typeOptions = cardTypes.length ? cardTypes : Object.keys(CARD_TYPE_LABELS);
   const effectOptions = useMemo(
@@ -559,6 +587,10 @@ const AddCardForm = ({
       onError('Choose an image for the card.');
       return;
     }
+    if (behaviour === 'custom' && abilityIsEmpty) {
+      onError('Add at least one step or effect to the custom ability.');
+      return;
+    }
     setBusy(true);
     try {
       await adminApi.addCard(packId, {
@@ -566,8 +598,9 @@ const AddCardForm = ({
         type,
         count: Math.max(1, Math.min(20, parseInt(count, 10) || 1)),
         description: description.trim(),
-        effectKey,
-        baseCardTitle: baseCardTitle || undefined,
+        effectKey: behaviour === 'custom' ? 'none' : effectKey,
+        baseCardTitle: behaviour === 'custom' ? undefined : baseCardTitle || undefined,
+        ability: behaviour === 'custom' ? ability : undefined,
         image: imageData,
       });
       setTitle('');
@@ -575,6 +608,8 @@ const AddCardForm = ({
       setDescription('');
       setEffectKey('none');
       setBaseCardTitle('');
+      setAbility({ mode: 'builder', trigger: 'enter', mandatory: true, steps: [], effects: [] });
+      setBehaviour('simple');
       setImageData('');
       onAdded();
     } catch (err: any) {
@@ -610,24 +645,70 @@ const AddCardForm = ({
           />
         </Label>
 
-        <Label style={{ gridColumn: '1 / -1' }}>
-          Plays as (full ability of a real card — optional)
-          <Select value={baseCardTitle} onChange={(e) => setBaseCardTitle(e.target.value)}>
-            <option value="">— custom / no built-in ability —</option>
-            {baseCards.map((b) => (
-              <option key={b.title} value={b.title}>
-                {b.title} ({CARD_TYPE_LABELS[b.type] || b.type})
-              </option>
-            ))}
-          </Select>
-        </Label>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <ModeTabs>
+            <ModeTab
+              type="button"
+              $active={behaviour === 'simple'}
+              onClick={() => setBehaviour('simple')}
+            >
+              Preset / plays-as
+            </ModeTab>
+            <ModeTab
+              type="button"
+              $active={behaviour === 'custom'}
+              onClick={() => setBehaviour('custom')}
+            >
+              Custom ability
+            </ModeTab>
+          </ModeTabs>
+        </div>
 
-        {linked ? (
-          <LinkedNote style={{ gridColumn: '1 / -1' }}>
-            This card will behave exactly like <strong>{linked.title}</strong> — type{' '}
-            <strong>{CARD_TYPE_LABELS[linked.type] || linked.type}</strong>.
-            {linked.description ? <em> “{linked.description}”</em> : null}
-          </LinkedNote>
+        {behaviour === 'simple' ? (
+          <>
+            <Label style={{ gridColumn: '1 / -1' }}>
+              Plays as (full ability of a real card — optional)
+              <Select value={baseCardTitle} onChange={(e) => setBaseCardTitle(e.target.value)}>
+                <option value="">— no built-in ability —</option>
+                {baseCards.map((b) => (
+                  <option key={b.title} value={b.title}>
+                    {b.title} ({CARD_TYPE_LABELS[b.type] || b.type})
+                  </option>
+                ))}
+              </Select>
+            </Label>
+
+            {linked ? (
+              <LinkedNote style={{ gridColumn: '1 / -1' }}>
+                This card will behave exactly like <strong>{linked.title}</strong> — type{' '}
+                <strong>{CARD_TYPE_LABELS[linked.type] || linked.type}</strong>.
+                {linked.description ? <em> “{linked.description}”</em> : null}
+              </LinkedNote>
+            ) : (
+              <>
+                <Label>
+                  Type
+                  <Select value={type} onChange={(e) => setType(e.target.value)}>
+                    {typeOptions.map((t) => (
+                      <option key={t} value={t}>
+                        {CARD_TYPE_LABELS[t] || t}
+                      </option>
+                    ))}
+                  </Select>
+                </Label>
+                <Label style={{ gridColumn: 'span 2' }}>
+                  Preset effect
+                  <Select value={effectKey} onChange={(e) => setEffectKey(e.target.value)}>
+                    {effectOptions.map((e) => (
+                      <option key={e.key} value={e.key}>
+                        {e.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Label>
+              </>
+            )}
+          </>
         ) : (
           <>
             <Label>
@@ -640,16 +721,9 @@ const AddCardForm = ({
                 ))}
               </Select>
             </Label>
-            <Label style={{ gridColumn: 'span 2' }}>
-              Preset effect
-              <Select value={effectKey} onChange={(e) => setEffectKey(e.target.value)}>
-                {effectOptions.map((e) => (
-                  <option key={e.key} value={e.key}>
-                    {e.label}
-                  </option>
-                ))}
-              </Select>
-            </Label>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <AbilityBuilder catalog={abilityCatalog} value={ability} onChange={setAbility} />
+            </div>
           </>
         )}
 
@@ -665,6 +739,217 @@ const AddCardForm = ({
         </div>
       </AddGrid>
     </form>
+  );
+};
+
+// --------------------------------------------------------------- ability builder
+type AbilityStepLike = { action: string; params: Record<string, any> };
+
+const RAW_EXAMPLE = `[
+  { "trigger": "enter", "do": { "type": "add_scene", "info": {
+    "mandatory": true, "endTurnImmediately": false,
+    "actions": [
+      { "instructions": [ { "protagonist": "owner",
+        "do": { "key": "discard", "info": { "count": 2, "type": "any" } },
+        "ui": { "type": "single_action_popup", "info": { "singleActionText": "Discard 2" } } } ] },
+      { "instructions": [ { "protagonist": "owner",
+        "do": { "key": "destroy", "info": { "type": "unicorn" } },
+        "ui": { "type": "card_to_card" } } ] }
+    ] } } }
+]`;
+
+const AbilityBuilder = ({
+  catalog,
+  value,
+  onChange,
+}: {
+  catalog: AbilityCatalog | null;
+  value: AbilitySpec;
+  onChange: (s: AbilitySpec) => void;
+}) => {
+  const update = (patch: Partial<AbilitySpec>) => onChange({ ...value, ...patch });
+  const steps = value.steps || [];
+  const effects = value.effects || [];
+
+  if (!catalog) {
+    return <BuilderBox>Loading ability options…</BuilderBox>;
+  }
+
+  const actionById = (id: string) => catalog.actions.find((a) => a.id === id);
+  const destroyTrigger = value.trigger === 'this_destroyed_or_sacrificed';
+
+  const setStep = (i: number, patch: Partial<AbilityStepLike>) =>
+    update({ steps: steps.map((s, k) => (k === i ? { ...s, ...patch } : s)) });
+
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= steps.length) return;
+    const next = steps.slice();
+    const t = next[i];
+    next[i] = next[j];
+    next[j] = t;
+    update({ steps: next });
+  };
+
+  return (
+    <BuilderBox>
+      <ModeTabs style={{ margin: '0 0 10px' }}>
+        <ModeTab type="button" $active={value.mode !== 'raw'} onClick={() => update({ mode: 'builder' })}>
+          Builder
+        </ModeTab>
+        <ModeTab type="button" $active={value.mode === 'raw'} onClick={() => update({ mode: 'raw' })}>
+          Advanced (JSON)
+        </ModeTab>
+      </ModeTabs>
+
+      {value.mode === 'raw' ? (
+        <>
+          <Muted style={{ marginTop: 0 }}>
+            Paste an <code>on</code> array (list of <code>{'{ trigger, do }'}</code>). Every action
+            key, ui type and effect key is checked against the engine's whitelist on save — anything
+            unknown is rejected.
+          </Muted>
+          <Label>
+            on (JSON array)
+            <TextArea
+              rows={8}
+              value={value.onJson || ''}
+              onChange={(e) => update({ onJson: e.target.value })}
+              placeholder={RAW_EXAMPLE}
+            />
+          </Label>
+          <Label>
+            passive (JSON array of strings — optional)
+            <TextArea
+              rows={2}
+              value={value.passiveJson || ''}
+              onChange={(e) => update({ passiveJson: e.target.value })}
+              placeholder={'["count_as_two"]'}
+            />
+          </Label>
+        </>
+      ) : (
+        <>
+          <Row2>
+            <Label style={{ flex: '2 1 260px' }}>
+              When does it happen?
+              <Select
+                value={value.trigger || 'enter'}
+                onChange={(e) => update({ trigger: e.target.value })}
+              >
+                {catalog.triggers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+            </Label>
+            {!destroyTrigger && (
+              <label
+                style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, paddingBottom: 10 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={value.mandatory !== false}
+                  onChange={(e) => update({ mandatory: e.target.checked })}
+                />
+                Must do it (not optional)
+              </label>
+            )}
+          </Row2>
+
+          {destroyTrigger ? (
+            <Muted>
+              This trigger only supports the “return it to your hand instead” effect below. Step
+              sequences aren't run on destruction.
+            </Muted>
+          ) : (
+            <>
+              <SubLabelText>Steps (run in order)</SubLabelText>
+              {steps.length === 0 && <Muted style={{ margin: '4px 0' }}>No steps yet.</Muted>}
+              {steps.map((s, i) => {
+                const def = actionById(s.action);
+                return (
+                  <StepRow key={i}>
+                    <span className="num">{i + 1}</span>
+                    <Select
+                      value={s.action}
+                      onChange={(e) => setStep(i, { action: e.target.value, params: {} })}
+                      style={{ minHeight: 34, fontSize: 13, flex: '1 1 240px' }}
+                    >
+                      {catalog.actions.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.label}
+                        </option>
+                      ))}
+                    </Select>
+                    {(def?.params || []).map((p) => (
+                      <span key={p.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <small style={{ color: '#8aa' }}>{p.label}</small>
+                        <Field
+                          type="number"
+                          min={p.min}
+                          max={p.max}
+                          value={String(s.params?.[p.name] ?? p.dflt ?? p.min ?? 1)}
+                          onChange={(e) =>
+                            setStep(i, { params: { ...(s.params || {}), [p.name]: e.target.value } })
+                          }
+                          style={{ width: 56, minHeight: 34, padding: '0.3em', letterSpacing: 'normal' }}
+                        />
+                      </span>
+                    ))}
+                    <MiniBtn type="button" title="Move up" onClick={() => move(i, -1)}>
+                      ▲
+                    </MiniBtn>
+                    <MiniBtn type="button" title="Move down" onClick={() => move(i, 1)}>
+                      ▼
+                    </MiniBtn>
+                    <MiniBtn
+                      type="button"
+                      title="Remove"
+                      onClick={() => update({ steps: steps.filter((_, k) => k !== i) })}
+                    >
+                      ✕
+                    </MiniBtn>
+                  </StepRow>
+                );
+              })}
+              <MiniBtn
+                type="button"
+                style={{ marginTop: 6, padding: '0.4em 0.8em' }}
+                onClick={() =>
+                  update({
+                    steps: [...steps, { action: catalog.actions[0]?.id || 'draw', params: {} }],
+                  })
+                }
+              >
+                + Add step
+              </MiniBtn>
+            </>
+          )}
+
+          <SubLabelText style={{ marginTop: 14 }}>Persistent / passive effects</SubLabelText>
+          <CheckGrid>
+            {catalog.effects.map((e) => (
+              <CheckItem key={e.id}>
+                <input
+                  type="checkbox"
+                  checked={effects.indexOf(e.id) !== -1}
+                  onChange={(ev) =>
+                    update({
+                      effects: ev.target.checked
+                        ? [...effects, e.id]
+                        : effects.filter((x) => x !== e.id),
+                    })
+                  }
+                />
+                {e.label}
+              </CheckItem>
+            ))}
+          </CheckGrid>
+        </>
+      )}
+    </BuilderBox>
   );
 };
 
@@ -1040,6 +1325,73 @@ const ModeTab = styled.button<{ $active: boolean }>`
   padding: 0.45em 0.9em;
   border-radius: 999px;
   cursor: pointer;
+`;
+
+const BuilderBox = styled.div`
+  border: 1px solid ${COLORS.panelBorder};
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+`;
+
+const Row2 = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+`;
+
+const SubLabelText = styled.div`
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: ${COLORS.textMuted};
+  margin: 8px 0 2px;
+`;
+
+const StepRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px solid ${COLORS.panelBorder};
+
+  .num {
+    width: 18px;
+    text-align: center;
+    font-weight: 700;
+    color: ${COLORS.textMuted};
+  }
+`;
+
+const MiniBtn = styled.button`
+  border: 1px solid ${COLORS.panelBorder};
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-radius: 7px;
+  font-size: 12px;
+  padding: 0.25em 0.5em;
+  cursor: pointer;
+  &:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+`;
+
+const CheckGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 12px;
+`;
+
+const CheckItem = styled.label`
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.9);
 `;
 
 const LinkedNote = styled.div`

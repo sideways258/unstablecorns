@@ -3,6 +3,20 @@
 
 const TOKEN_KEY = 'uu-admin-token';
 
+export type AbilityStep = { action: string; params: Record<string, any> };
+
+export type AbilitySpec = {
+  mode: 'builder' | 'raw';
+  // builder
+  trigger?: string;
+  mandatory?: boolean;
+  steps?: AbilityStep[];
+  effects?: string[];
+  // raw
+  onJson?: string;
+  passiveJson?: string;
+};
+
 export type StoredCard = {
   id: string;
   title: string;
@@ -12,10 +26,26 @@ export type StoredCard = {
   effectKey: string;
   /** If set, the card plays with the full mechanics of this implemented card. */
   baseCardTitle?: string;
+  /** If set, a fully custom ability composed in the admin panel. */
+  ability?: AbilitySpec;
   image: string;
 };
 
 export type BaseCard = { title: string; type: string; description: string };
+
+export type AbilityParam = {
+  name: string;
+  label: string;
+  type: string;
+  min?: number;
+  max?: number;
+  dflt?: any;
+};
+export type AbilityCatalog = {
+  triggers: { id: string; label: string }[];
+  actions: { id: string; label: string; params: AbilityParam[] }[];
+  effects: { id: string; label: string }[];
+};
 
 export type StoredPack = {
   id: string;
@@ -99,6 +129,8 @@ export const adminApi = {
 
   baseCards: () => req<{ cards: BaseCard[] }>('/api/admin/base-cards'),
 
+  abilityCatalog: () => req<AbilityCatalog>('/api/admin/ability-catalog'),
+
   createPack: (name: string, blurb: string) =>
     req<{ pack: StoredPack }>('/api/admin/packs', {
       method: 'POST',
@@ -116,6 +148,7 @@ export const adminApi = {
       description: string;
       effectKey: string;
       baseCardTitle?: string;
+      ability?: AbilitySpec;
       image: string;
     }
   ) =>

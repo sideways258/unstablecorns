@@ -284,6 +284,12 @@ function handle(ctx) {
         return Promise.resolve();
     }
 
+    // Building blocks for the custom-ability builder.
+    if (p === "/api/admin/ability-catalog" && method === "GET") {
+        ctx.body = ce.getAbilityCatalog();
+        return Promise.resolve();
+    }
+
     // all mutations require the password to have been changed off the default
     if (p === "/api/admin/packs" && method === "POST") {
         requirePasswordChanged(admin);
@@ -327,8 +333,15 @@ function handle(ctx) {
             var count = parseInt(body.count, 10);
             var description = (body.description || "").trim();
             var effectKey = (body.effectKey || "none").trim();
-            // Optional: play exactly as an implemented card.
-            var baseCardTitle = ce.resolveBaseCardTitle(body.baseCardTitle);
+
+            // Precedence: fully custom ability > "plays as" > preset effect.
+            var ability = null;
+            if (body.ability && typeof body.ability === "object") {
+                ce.compileAbility(body.ability); // throws httpError(400) if invalid
+                ability = body.ability;
+            }
+
+            var baseCardTitle = ability ? "" : ce.resolveBaseCardTitle(body.baseCardTitle);
             if (baseCardTitle) {
                 // type + mechanics come from the base card; ignore the picked ones
                 var baseCard = ce.getBaseCardCatalog().filter(function (b) { return b.title === baseCardTitle; })[0];
@@ -338,11 +351,12 @@ function handle(ctx) {
                     throw httpError(400, "Baby Unicorns are the fixed starter pool and can't be added as custom cards");
                 }
             }
+            if (ability) { effectKey = "none"; }
 
             if (title.length < 1 || title.length > 60) { throw httpError(400, "Card name must be 1-60 characters"); }
             if (ce.CARD_TYPES.indexOf(type) === -1) { throw httpError(400, "Unknown card type"); }
             if (!(count >= 1 && count <= 20)) { throw httpError(400, "Count must be 1-20"); }
-            if (!baseCardTitle && !ce.effectAllowed(type, effectKey)) { effectKey = "none"; }
+            if (!baseCardTitle && !ability && !ce.effectAllowed(type, effectKey)) { effectKey = "none"; }
 
             var img = decodeImageDataUrl(body.image);
             var cardId = randId("c_");
@@ -358,6 +372,7 @@ function handle(ctx) {
                 description: description.slice(0, 400),
                 effectKey: effectKey,
                 baseCardTitle: baseCardTitle || undefined,
+                ability: ability || undefined,
                 image: "/uploads/" + fileName,
                 createdAt: Date.now(),
             };
