@@ -846,16 +846,24 @@ const AbilityBuilder = ({
               </Select>
             </Label>
             {!destroyTrigger && (
-              <label
-                style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, paddingBottom: 10 }}
-              >
-                <input
-                  type="checkbox"
-                  checked={value.mandatory !== false}
-                  onChange={(e) => update({ mandatory: e.target.checked })}
-                />
-                Must do it (not optional)
-              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={value.mandatory !== false}
+                    onChange={(e) => update({ mandatory: e.target.checked })}
+                  />
+                  Must do it (not optional)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!value.endTurnImmediately}
+                    onChange={(e) => update({ endTurnImmediately: e.target.checked })}
+                  />
+                  Then immediately end the turn
+                </label>
+              </div>
             )}
           </Row2>
 

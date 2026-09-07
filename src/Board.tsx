@@ -605,7 +605,8 @@ const Board = (props: any) => {
                             if (cardInteraction?.key === "card_to_player") {
                                 console.log("Detected click for cardInteraction with key <card_to_player>");
 
-                                if (G.deck[cardInteraction.info.sourceCardID].title === "Blatant Thievery") {
+                                if (G.deck[cardInteraction.info.sourceCardID].title === "Blatant Thievery"
+                                    || boardStates.some(s => s.type === "blatantThievery1" && s.info?.sourceCardID === cardInteraction.info.sourceCardID)) {
                                     setShowBlatantThievery(plid);
                                     return;
                                 }

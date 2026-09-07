@@ -10,6 +10,8 @@ export type AbilitySpec = {
   // builder
   trigger?: string;
   mandatory?: boolean;
+  /** After the steps resolve, immediately end the player's turn (Rhinocorn etc.). */
+  endTurnImmediately?: boolean;
   steps?: AbilityStep[];
   effects?: string[];
   // raw

@@ -119,6 +119,11 @@ function enter(G, ctx, param) {
                 });
                 G.upgradeDowngradeStable[param.playerID] = underscore_1["default"].difference(G.upgradeDowngradeStable[param.playerID], toBeRemoved);
                 G.discardPile = __spreadArrays(G.discardPile, toBeRemoved);
+                // The cards left the stable - drop the effects they registered
+                // (otherwise e.g. "you cannot play Neigh cards" lingers forever).
+                G.playerEffects[param.playerID] = G.playerEffects[param.playerID].filter(function (eff) {
+                    return eff.cardID === undefined || toBeRemoved.indexOf(eff.cardID) === -1;
+                });
             }
         });
         cardOnEnter.filter(function (on) { return on["do"].type === "add_effect"; }).forEach(function (on) {

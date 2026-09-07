@@ -206,6 +206,77 @@ var EFFECTS = {
         types: ["downgrade"],
         build: function () { return enterEffect("you_cannot_play_upgrades"); },
     },
+
+    // ---- more magic one-shots (from the real-card catalog) ----
+    magic_sacrifice_or_destroy_up_down: {
+        label: "Magic: SACRIFICE a Downgrade of yours, or DESTROY an opponent's Upgrade",
+        types: ["magic"],
+        build: function () { return scene(true, "enter", [step({ key: "destroy", info: { type: "my_downgrade_other_upgrade" } }, { type: "card_to_card" })]); },
+    },
+    magic_return_stable_card_to_hand: {
+        label: "Magic: return a card in another player's Stable to their hand",
+        types: ["magic"],
+        build: function () { return scene(true, "enter", [step({ key: "returnToHand", info: { who: "another" } }, { type: "card_to_card" })]); },
+    },
+    magic_shake_up: {
+        label: "Magic: shuffle your hand + discard pile into the deck, then DRAW 5",
+        types: ["magic"],
+        build: function () { return scene(true, "enter", [step({ key: "shakeUp" }, popup("Shake it up"))]); },
+    },
+    magic_look_at_hand_take_card: {
+        label: "Magic: look at another player's hand and take a card",
+        types: ["magic"],
+        build: function () { return scene(true, "enter", [step({ key: "blatantThievery1" }, { type: "card_to_player" })]); },
+    },
+    magic_take_another_turn: {
+        label: "Magic: DISCARD 3 cards, then take another turn",
+        types: ["magic"],
+        build: function () { return scene(true, "enter", [step({ key: "discard", info: { count: 3, type: "any", changeOfLuck: true } }, popup("Discard 3 cards"))]); },
+    },
+
+    // ---- more unicorn "when it enters" one-shots ----
+    unicorn_enter_bring_basic: {
+        label: "Unicorn: when it enters, bring a Basic Unicorn from your hand into your Stable",
+        types: ["unicorn", "narwhal"],
+        build: function () { return scene(false, "enter", [step({ key: "bringToStable", info: { type: "basic_unicorn" } }, popup("Bring a Basic Unicorn into your Stable"))]); },
+    },
+    unicorn_enter_return_stable_card: {
+        label: "Unicorn: when it enters, return a card in a player's Stable to their hand",
+        types: ["unicorn", "narwhal"],
+        build: function () { return scene(false, "enter", [step({ key: "returnToHand", info: { who: "another" } }, { type: "card_to_card" })]); },
+    },
+    unicorn_enter_look_take_card: {
+        label: "Unicorn: when it enters, look at a player's hand and take a card",
+        types: ["unicorn", "narwhal"],
+        build: function () { return scene(false, "enter", [step({ key: "blatantThievery1" }, { type: "card_to_player" })]); },
+    },
+    unicorn_bodyguard: {
+        label: "Unicorn: if one of your Unicorns would be destroyed, you may SACRIFICE this instead",
+        types: ["unicorn", "narwhal"],
+        build: function () { return enterEffect("save_mate_by_sacrifice"); },
+    },
+
+    // ---- more upgrades / downgrades ----
+    upgrade_basic_unicorns_only_yours: {
+        label: "Upgrade: Basic Unicorns cannot enter any other player's Stable",
+        types: ["upgrade", "unicorn"],
+        build: function () { return enterEffect("basic_unicorns_can_only_join_your_stable"); },
+    },
+    downgrade_overcrowded_stable: {
+        label: "Downgrade: if you have more than 5 Unicorns, SACRIFICE one",
+        types: ["downgrade"],
+        build: function () { return enterEffect("tiny_stable"); },
+    },
+    downgrade_triggers_disabled: {
+        label: "Downgrade: triggered effects of your Unicorn cards do not activate",
+        types: ["downgrade"],
+        build: function () { return enterEffect("my_unicorns_are_basic"); },
+    },
+    downgrade_unicorns_are_pandas: {
+        label: "Downgrade: your Unicorns count as Pandas (immune to Unicorn-targeting cards)",
+        types: ["downgrade"],
+        build: function () { return enterEffect("pandamonium"); },
+    },
 };
 exports.EFFECTS = EFFECTS;
 
@@ -355,6 +426,56 @@ var ABILITY_ACTIONS = {
         params: [],
         build: function () { return actionStep("owner", { key: "reset" }, popup("Reset all Upgrades / Downgrades")); },
     },
+
+    // ---- added from the real-card catalog (existing engine mechanics) ----
+    sacrifice_or_destroy_up_down: {
+        label: "SACRIFICE one of your Downgrades, or DESTROY an opponent's Upgrade",
+        params: [],
+        build: function () { return actionStep("owner", { key: "destroy", info: { type: "my_downgrade_other_upgrade" } }, { type: "card_to_card" }); },
+    },
+    return_stable_card_to_hand: {
+        label: "Return a card in another player's Stable to their hand",
+        params: [],
+        build: function () { return actionStep("owner", { key: "returnToHand", info: { who: "another" } }, { type: "card_to_card" }); },
+    },
+    back_kick: {
+        label: "Return a Stable card to its owner's hand; that player then DISCARDs a card",
+        params: [],
+        build: function () { return actionStep("owner", { key: "backKick" }, { type: "card_to_card" }); },
+    },
+    bring_basic_unicorn_from_hand: {
+        label: "Bring a Basic Unicorn from your hand directly into your Stable",
+        params: [],
+        build: function () { return actionStep("owner", { key: "bringToStable", info: { type: "basic_unicorn" } }, popup("Bring a Basic Unicorn into your Stable")); },
+    },
+    look_at_hand_take_card: {
+        label: "Look at another player's hand and take a card from it",
+        params: [],
+        build: function () { return actionStep("owner", { key: "blatantThievery1" }, { type: "card_to_player" }); },
+    },
+    shake_up: {
+        label: "Shuffle your hand + the discard pile into the deck, then DRAW 5 cards",
+        params: [],
+        build: function () { return actionStep("owner", { key: "shakeUp" }, popup("Shake it up")); },
+    },
+    search_narwhal: {
+        label: "SEARCH the deck for a Narwhal card, then shuffle",
+        params: [],
+        build: function () { return actionStep("owner", { key: "search", info: { type: "narwhal" } }, popup("Search the deck")); },
+    },
+    take_magic_from_discard: {
+        label: "Add a Magic card from the discard pile to your hand",
+        params: [],
+        build: function () { return actionStep("owner", { key: "addFromDiscardPileToHand", info: { type: "magic" } }, popup("Take from discard pile")); },
+    },
+    discard_then_take_another_turn: {
+        label: "DISCARD cards, then take another turn",
+        params: [{ name: "count", label: "How many", type: "int", min: 1, max: 4, dflt: 2 }],
+        build: function (p) {
+            var n = clampInt(p.count, 1, 4, 2);
+            return actionStep("owner", { key: "discard", info: { count: n, type: "any", changeOfLuck: true } }, popup("Discard " + n + (n === 1 ? " card" : " cards")));
+        },
+    },
 };
 exports.ABILITY_ACTIONS = ABILITY_ACTIONS;
 
@@ -369,6 +490,13 @@ var ABILITY_EFFECTS = {
     count_as_two: { label: "This card counts as 2 Unicorns", passive: ["count_as_two"] },
     immune_to_magic_destroy: { label: "This card cannot be destroyed by Magic cards", passive: ["cannot_be_destroyed_by_magic"] },
     return_when_lost: { label: "If destroyed or sacrificed, return it to your hand instead", on: returnOnLoss() },
+
+    // ---- added from the real-card catalog (existing engine effect keys) ----
+    basic_unicorns_only_join_you: { label: "Basic Unicorn cards cannot enter any other player's Stable (Queen Bee)", on: enterEffect("basic_unicorns_can_only_join_your_stable") },
+    your_unicorn_triggers_disabled: { label: "Triggered effects of your Unicorn cards do not activate (Blinding Light)", on: enterEffect("my_unicorns_are_basic") },
+    your_unicorns_are_pandas: { label: "Your Unicorns count as Pandas - cards that affect Unicorns don't affect them (Pandamonium)", on: enterEffect("pandamonium") },
+    overcrowded_stable: { label: "If you ever have more than 5 Unicorns in your Stable, SACRIFICE one (Tiny Stable)", on: enterEffect("tiny_stable") },
+    bodyguard: { label: "If one of your Unicorns would be destroyed, you may SACRIFICE this card instead (Black Knight)", on: enterEffect("save_mate_by_sacrifice") },
 };
 exports.ABILITY_EFFECTS = ABILITY_EFFECTS;
 
@@ -480,7 +608,7 @@ function compileAbility(spec) {
         });
         out.push({
             trigger: trigger,
-            "do": { type: "add_scene", info: { actions: actions, mandatory: !!spec.mandatory, endTurnImmediately: false } },
+            "do": { type: "add_scene", info: { actions: actions, mandatory: !!spec.mandatory, endTurnImmediately: !!spec.endTurnImmediately } },
         });
     }
 

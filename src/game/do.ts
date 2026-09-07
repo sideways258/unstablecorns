@@ -122,7 +122,13 @@ export function enter(G: UnstableUnicornsGame, ctx: Ctx, param: ParamEnter) {
                 G.upgradeDowngradeStable[param.playerID] = _.difference(G.upgradeDowngradeStable[param.playerID], toBeRemoved);
 
                 G.discardPile = [...G.discardPile, ...toBeRemoved];
-            } 
+
+                // The cards left the stable - drop the effects they registered
+                // (otherwise e.g. "you cannot play Neigh cards" lingers forever).
+                G.playerEffects[param.playerID] = G.playerEffects[param.playerID].filter(
+                    eff => eff.cardID === undefined || toBeRemoved.indexOf(eff.cardID) === -1
+                );
+            }
         });
 
         cardOnEnter.filter(on => on.do.type === "add_effect").forEach(on => {
