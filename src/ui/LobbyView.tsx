@@ -22,6 +22,8 @@ type Props = {
 
   isReady: boolean;
   onReadyClick: () => void;
+  /** Called when a readied player clicks the button again to un-ready. */
+  onUnreadyClick?: () => void;
   readyDisabled?: boolean;
   readyHint?: string;
 
@@ -143,10 +145,10 @@ const LobbyView = (props: Props) => {
         {props.readyHint && <Hint>{props.readyHint}</Hint>}
         <ReadyButton
           $ready={props.isReady}
-          disabled={props.readyDisabled}
-          onClick={props.onReadyClick}
+          disabled={props.isReady ? false : props.readyDisabled}
+          onClick={props.isReady ? props.onUnreadyClick || props.onReadyClick : props.onReadyClick}
         >
-          {props.isReady ? 'Waiting for others…' : "I'm ready!"}
+          {props.isReady ? 'Ready ✓ — tap to change pick' : "I'm ready!"}
         </ReadyButton>
       </LobbyPanel>
     </Wrapper>

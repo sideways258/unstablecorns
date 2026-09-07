@@ -105,10 +105,11 @@ const BoardGameBegin = (props: Props) => {
             onToggleExpansion={toggleExpansion}
             isReady={isReady}
             onReadyClick={() => props.moves.ready(props.playerID)}
+            onUnreadyClick={() => props.moves.unready(props.playerID)}
             readyDisabled={!hasPick}
             readyHint={
                 isReady
-                    ? "You're ready — your pick is locked in."
+                    ? 'Ready. Tap the button — or a different unicorn — to change your pick.'
                     : hasPick
                     ? 'Tap another unicorn to change your pick, then hit ready.'
                     : 'Pick a baby unicorn first.'
@@ -120,13 +121,14 @@ const BoardGameBegin = (props: Props) => {
                     const owner = props.G.babyStarter.find((f) => f.cardID === card.id);
                     const mine = owner?.owner === props.playerID;
                     const takenByOther = !!owner && !mine;
-                    const selectable = !isReady && !takenByOther;
+                    // Re-picking is allowed even while ready - selectBaby un-readies you.
+                    const selectable = !takenByOther;
 
                     return (
                         <Baby
                             key={card.id}
                             $mine={mine}
-                            $dim={takenByOther || (isReady && !mine)}
+                            $dim={takenByOther}
                             $selectable={selectable}
                             onClick={() => selectable && props.moves.selectBaby(props.playerID, card.id)}
                         >

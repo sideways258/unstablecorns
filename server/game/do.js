@@ -28,9 +28,12 @@ function leave(G, ctx, param) {
     G.upgradeDowngradeStable[param.playerID] = underscore_1["default"].without(G.upgradeDowngradeStable[param.playerID], param.cardID);
     // remove player effect
     G.playerEffects[param.playerID] = underscore_1["default"].filter(G.playerEffects[param.playerID], function (eff) { return eff.cardID !== param.cardID; });
-    // when another unicorn enters your stable
-    // inject action after the current action
-    var on = __spreadArrays(G.stable[param.playerID], G.upgradeDowngradeStable[param.playerID]).map(function (c) { return G.deck[c]; }).filter(function (s) { return s.on && s.on.filter(function (o) { return o.trigger === "unicorn_leaves_your_stable"; }).length > 0; });
+    // when a UNICORN leaves your stable, inject an action (Barbed Wire etc.).
+    // Only fires when the card that left is an actual Unicorn.
+    var on = (card_1.isUnicorn(G.deck[param.cardID])
+        ? __spreadArrays(G.stable[param.playerID], G.upgradeDowngradeStable[param.playerID])
+        : []
+    ).map(function (c) { return G.deck[c]; }).filter(function (s) { return s.on && s.on.filter(function (o) { return o.trigger === "unicorn_leaves_your_stable"; }).length > 0; });
     on.forEach(function (card) {
         var _a;
         // all unicorns are basic
@@ -172,9 +175,12 @@ function enter(G, ctx, param) {
             }
         }
     }
-    // when another unicorn enters your stable
-    // inject action after the current action
-    var on = __spreadArrays(G.stable[param.playerID], G.upgradeDowngradeStable[param.playerID]).map(function (c) { return G.deck[c]; }).filter(function (s) { return s.on && s.on.filter(function (o) { return o.trigger === "unicorn_enters_your_stable"; }).length > 0; });
+    // when another UNICORN enters your stable, inject an action (Barbed Wire etc.).
+    // Only fires for actual Unicorn cards - not upgrades / downgrades / magic.
+    var on = (card_1.isUnicorn(card)
+        ? __spreadArrays(G.stable[param.playerID], G.upgradeDowngradeStable[param.playerID])
+        : []
+    ).map(function (c) { return G.deck[c]; }).filter(function (s) { return s.on && s.on.filter(function (o) { return o.trigger === "unicorn_enters_your_stable"; }).length > 0; });
     on.forEach(function (card) {
         var _a;
         // all unicorns are basic
@@ -225,10 +231,13 @@ function canEnter(G, ctx, param) {
     if (G.deck[param.cardID].type === "neigh" || G.deck[param.cardID].type === "super_neigh") {
         return false;
     }
-    if (G.stable[param.playerID].length === constants_1.CONSTANTS.stableSeats) {
+    var card = G.deck[param.cardID];
+    // Upgrade / Downgrade cards go into their own stable row - a full Unicorn
+    // stable never blocks them (e.g. stealing an Upgrade with Alluring Narwhal).
+    if (card.type !== "upgrade" && card.type !== "downgrade"
+        && G.stable[param.playerID].length === constants_1.CONSTANTS.stableSeats) {
         return false;
     }
-    var card = G.deck[param.cardID];
     if (G.playerEffects[param.playerID].find(function (s) { return s.effect.key === "you_cannot_play_upgrades"; })) {
         if (card.type === "upgrade") {
             return false;
@@ -678,7 +687,9 @@ function findSacrificeTargets(G, ctx, protagonist, info) {
         });
     }
     if (info.type === "any") {
-        targets = G.stable[protagonist].map(function (c) { return ({ cardID: c }); });
+        // "SACRIFICE a card" = any card in your own stable, incl. Upgrades /
+        // Downgrades (e.g. sacrificing your own Barbed Wire to Glitter Bomb).
+        targets = __spreadArrays(G.stable[protagonist], G.upgradeDowngradeStable[protagonist]).map(function (c) { return ({ cardID: c }); });
     }
     return targets;
 }

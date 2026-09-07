@@ -228,7 +228,7 @@ var UnstableUnicorns = {
         },
         stages: {
             pregame: {
-                moves: { ready: ready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout }
+                moves: { ready: ready, unready: unready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout }
             },
             beginning: {
                 moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout }
@@ -449,6 +449,13 @@ function ready(G, ctx, protagonist) {
         (_a = ctx.events) === null || _a === void 0 ? void 0 : _a.setPhase("main");
     }
 }
+// Un-ready in the lobby so you can change your baby unicorn pick.
+function unready(G, ctx, protagonist) {
+    if (ctx.phase !== "pregame") {
+        return core_1.INVALID_MOVE;
+    }
+    G.ready[protagonist] = false;
+}
 function selectBaby(G, ctx, protagonist, cardID) {
     // Players may change their pick in the lobby: drop any previous choice first.
     G.babyStarter = G.babyStarter.filter(function (s) { return s.owner !== protagonist; });
@@ -456,6 +463,8 @@ function selectBaby(G, ctx, protagonist, cardID) {
         cardID: cardID,
         owner: protagonist
     });
+    // Changing your pick un-readies you (so a stale pick can't be locked in).
+    G.ready[protagonist] = false;
 }
 var TIMER_MIN_SEC = 60;
 var TIMER_MAX_SEC = 300;
