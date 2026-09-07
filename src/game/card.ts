@@ -1341,7 +1341,7 @@ const Cards: CardDefinition[] = [{
                             key: "sacrifice",
                             info: { type: "any" }
                         },
-                        ui: { type: "card_to_card" }
+                        ui: { type: "click_on_card_in_stable" }
                     }]
                 }, {
                     instructions: [{
@@ -1451,7 +1451,7 @@ const Cards: CardDefinition[] = [{
                             key: "sacrifice",
                             info: { type: "any" }
                         },
-                        ui: { type: "card_to_card" }
+                        ui: { type: "click_on_card_in_stable" }
                     }]
                 }, {
                     instructions: [{

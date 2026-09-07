@@ -679,6 +679,15 @@ export function canPlayCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: Play
 }
 
 function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, cardID: CardID) {
+    // Guard against a duplicate dispatch (double-click / laggy multiplayer round
+    // trip): the card has already left the hand, and a neigh discussion is
+    // already pending for it. Re-running would create a second neigh discussion
+    // that overwrites the first, so an opponent who already answered "don't
+    // neigh" gets prompted again.
+    if (G.neighDiscussion || G.hand[protagonist].indexOf(cardID) === -1) {
+        return INVALID_MOVE;
+    }
+
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
     const logEntry = _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
@@ -706,6 +715,12 @@ function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, card
 }
 
 function playUpgradeDowngradeCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, targetPlayer: PlayerID, cardID: CardID) {
+    // See playCard: reject a duplicate dispatch so a second neigh discussion
+    // can't overwrite the first.
+    if (G.neighDiscussion || G.hand[protagonist].indexOf(cardID) === -1) {
+        return INVALID_MOVE;
+    }
+
     G.countPlayedCardsInActionPhase = G.countPlayedCardsInActionPhase + 1;
     G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
     _log(G, ctx, protagonist, String(targetPlayer) === String(protagonist)
