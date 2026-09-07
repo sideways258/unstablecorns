@@ -17,9 +17,15 @@ var MIN_PASSWORD_LEN = 8;
 var TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 var MAX_BODY = 12 * 1024 * 1024; // ~12MB raw (base64 image ~= 1.33x the PNG)
 
-// --- password + token helpers ------------------------------------------------
+// --- credential hashing -----------------------------------------------------
+// Nothing is ever stored in the clear: the password is a salted PBKDF2-SHA256
+// digest (slow, brute-force resistant) and the username is a salted SHA-256
+// digest. Both are one-way - login re-hashes the submitted value and compares.
 function hashPw(pw, salt) {
     return crypto.pbkdf2Sync(String(pw), salt, 100000, 32, "sha256").toString("hex");
+}
+function hashUsername(name, salt) {
+    return crypto.createHash("sha256").update(salt + "|user|" + String(name).trim().toLowerCase()).digest("hex");
 }
 function timingEqualHex(a, b) {
     if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) { return false; }
@@ -34,7 +40,17 @@ function loadAdmin() {
     try {
         var raw = fs.readFileSync(ADMIN_FILE, "utf8");
         var a = JSON.parse(raw);
-        if (a && a.username && a.salt && a.hash && a.secret) { return a; }
+        if (a && a.salt && a.hash && a.secret) {
+            // migrate a legacy file that stored the username in the clear
+            if (a.username && (!a.usernameHash || !a.usernameSalt)) {
+                a.usernameSalt = crypto.randomBytes(16).toString("hex");
+                a.usernameHash = hashUsername(a.username, a.usernameSalt);
+                delete a.username;
+                a.migratedAt = Date.now();
+                saveAdmin(a);
+            }
+            if (a.usernameHash && a.usernameSalt) { return a; }
+        }
     } catch (e) { /* fall through to seed */ }
     return seedAdmin();
 }
@@ -42,8 +58,12 @@ function loadAdmin() {
 function seedAdmin() {
     ce.ensureDirs();
     var salt = crypto.randomBytes(16).toString("hex");
+    var usernameSalt = crypto.randomBytes(16).toString("hex");
     var admin = {
-        username: DEFAULT_USERNAME,
+        // username salt is independent of the password salt so a password
+        // change (which rotates the password salt) never invalidates the login name
+        usernameSalt: usernameSalt,
+        usernameHash: hashUsername(DEFAULT_USERNAME, usernameSalt),
         salt: salt,
         hash: hashPw(DEFAULT_PASSWORD, salt),
         mustChangePassword: true,
@@ -231,14 +251,14 @@ function handle(ctx) {
         return readJsonBody(ctx).then(function (body) {
             var user = (body.username || "").trim();
             var pw = body.password || "";
-            var okUser = user.toLowerCase() === String(admin.username).toLowerCase();
+            var okUser = timingEqualHex(hashUsername(user, admin.usernameSalt), admin.usernameHash);
             var okPw = timingEqualHex(hashPw(pw, admin.salt), admin.hash);
             if (!okUser || !okPw) {
                 throw httpError(401, "Wrong username or password");
             }
             ctx.body = {
                 token: makeToken(admin),
-                username: admin.username,
+                username: user,
                 mustChangePassword: !!admin.mustChangePassword,
             };
         });
