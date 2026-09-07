@@ -672,8 +672,8 @@ const Board = (props: any) => {
                 <Bottom>
                     <Stable
                         ref={stableRef}
-                        cards={[...G.stable[playerID], ...G.temporaryStable[playerID]].map(c => G.deck[c])}
-                        upgradeDowngradeCards={G.upgradeDowngradeStable[playerID].map(c => G.deck[c])}
+                        cards={[...G.stable[playerID], ...G.temporaryStable[playerID]].map(c => G.deck[c]).filter((c): c is Card => !!c)}
+                        upgradeDowngradeCards={G.upgradeDowngradeStable[playerID].map(c => G.deck[c]).filter((c): c is Card => !!c)}
                         glowing={glowingCardIDs}
                         highlightMode={stableHighlightMode}
                         onStableItemClick={(evt, cardID) => {
@@ -1111,7 +1111,7 @@ const renderHand = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerID: Pla
     }
 
     return (
-        <Hand cards={G.hand[playerID].map(c => G.deck[c])} glowingCards={glowingCards} onClick={onClick} onMouseEnterHandCard={(idx) => onMouseEnterHandCard(idx)} onMouseLeaveHandCard={(idx) => onMouseLeaveHandCard(idx)} />
+        <Hand cards={G.hand[playerID].map(c => G.deck[c]).filter((c): c is Card => !!c)} glowingCards={glowingCards} onClick={onClick} onMouseEnterHandCard={(idx) => onMouseEnterHandCard(idx)} onMouseLeaveHandCard={(idx) => onMouseLeaveHandCard(idx)} />
     );
 }
 

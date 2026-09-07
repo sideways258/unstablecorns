@@ -1,6 +1,7 @@
 import type { Do } from "./do";
 import type { Effect } from "./effect";
 import { EXPANSION_CARDS } from "./expansions";
+import { getCustomCardDefs } from "./customCardDefs";
 
 export type CardID = number;
 
@@ -2213,10 +2214,12 @@ const Cards: CardDefinition[] = [{
 export function initializeDeck(enabledSets: string[] = []) {
     let deck: Card[] = [];
     // base cards first (ids 0..12 are always the Baby Unicorns), then any enabled
-    // expansion packs appended after.
+    // expansion packs appended after. Custom (admin-panel) packs come last, in
+    // the SAME order the server appends them so ids line up across client/server.
     const defs: CardDefinition[] = [
         ...Cards,
         ...EXPANSION_CARDS.filter(c => c.set && enabledSets.indexOf(c.set) !== -1),
+        ...getCustomCardDefs(enabledSets),
     ];
     defs.forEach(c => {
         for (let i=0; i<c.count; i++) {

@@ -517,6 +517,7 @@ const AddCardForm = ({
   effects,
   cardTypes,
   baseCards,
+  abilityCatalog,
   onAdded,
   onError,
 }: {

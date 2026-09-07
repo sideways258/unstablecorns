@@ -6,6 +6,11 @@ import reportWebVitals from './reportWebVitals';
 import { LanguageContextProvider } from './LanguageContextProvider';
 import { AudioSettingsProvider } from './audio';
 import { BoardThemeProvider } from './boardTheme';
+import { loadCustomCardDefs } from './game/customCardDefs';
+
+// Pull the admin-panel custom card definitions before anyone can start a match,
+// so this client's deck build matches the server's.
+loadCustomCardDefs();
 
 ReactDOM.render(
   <React.StrictMode>

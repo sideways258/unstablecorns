@@ -657,3 +657,16 @@ function buildCustomCardDefs(enabledIds) {
     return out;
 }
 exports.buildCustomCardDefs = buildCustomCardDefs;
+
+// Every custom card definition across every pack (each carries its `set`).
+// The front-end fetches this so its own initializeDeck() builds a deck
+// identical to the server's - otherwise G.deck[customCardId] is undefined on
+// the client and the board crashes when such a card is drawn.
+function buildAllCustomCardDefs() {
+    try {
+        return buildCustomCardDefs((loadState().packs || []).map(function (p) { return p.id; }));
+    } catch (e) {
+        return [];
+    }
+}
+exports.buildAllCustomCardDefs = buildAllCustomCardDefs;

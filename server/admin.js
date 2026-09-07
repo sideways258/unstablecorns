@@ -211,6 +211,13 @@ function handle(ctx) {
         return Promise.resolve();
     }
 
+    // public: compiled custom card definitions, so the front-end builds the
+    // exact same deck the server does.
+    if (p === "/api/custom-card-defs" && method === "GET") {
+        ctx.body = { defs: ce.buildAllCustomCardDefs() };
+        return Promise.resolve();
+    }
+
     if (p.indexOf("/api/admin/") !== 0) {
         ctx.status = 404;
         ctx.body = { error: "not found" };
