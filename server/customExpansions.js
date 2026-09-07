@@ -221,15 +221,90 @@ function effectAllowed(type, key) {
 }
 exports.effectAllowed = effectAllowed;
 
+// ---------------------------------------------------------------------------
+// "Plays as" support: an uploaded card can borrow the real mechanics of any
+// fully-implemented card (base game + built-in homebrew). We read the live
+// card definitions from ./game/card lazily (avoids a require cycle at load).
+// ---------------------------------------------------------------------------
+function baseDefsByTitle() {
+    var map = {};
+    try {
+        var cardMod = require("./game/card");
+        var defs = typeof cardMod.getAllCardDefs === "function" ? cardMod.getAllCardDefs() : [];
+        defs.forEach(function (d) {
+            if (!d || !d.title) { return; }
+            var key = String(d.title).toLowerCase();
+            if (!map[key]) { map[key] = d; } // first definition wins on duplicate titles
+        });
+    } catch (e) { /* ignore - falls back to preset effects */ }
+    return map;
+}
+
+// Catalog for the admin panel's "Plays as" picker.
+function getBaseCardCatalog() {
+    var seen = {};
+    var list = [];
+    var map = baseDefsByTitle();
+    Object.keys(map).forEach(function (k) {
+        var d = map[k];
+        if (seen[d.title]) { return; }
+        seen[d.title] = true;
+        list.push({
+            title: d.title,
+            type: d.type,
+            description: (d.description && (d.description.en || d.description.de)) || "",
+        });
+    });
+    list.sort(function (a, b) { return a.title.localeCompare(b.title); });
+    return list;
+}
+exports.getBaseCardCatalog = getBaseCardCatalog;
+
+// Resolve a user-supplied "plays as" name to a canonical implemented title,
+// or "" if there's no match.
+function resolveBaseCardTitle(name) {
+    if (!name || typeof name !== "string") { return ""; }
+    var map = baseDefsByTitle();
+    var d = map[name.trim().toLowerCase()];
+    return d ? d.title : "";
+}
+exports.resolveBaseCardTitle = resolveBaseCardTitle;
+
 // Turn stored cards into the CardDefinition shape initializeDeck() expects.
 function buildCustomCardDefs(enabledIds) {
     var ids = Array.isArray(enabledIds) ? enabledIds : [];
     var out = [];
     try {
+        var baseMap = baseDefsByTitle();
         var packs = loadState().packs || [];
         packs.forEach(function (p) {
             if (ids.indexOf(p.id) === -1) { return; }
             (p.cards || []).forEach(function (c) {
+                var count = Math.max(1, Math.min(20, c.count || 1));
+                var base = c.baseCardTitle ? baseMap[String(c.baseCardTitle).toLowerCase()] : null;
+
+                if (base) {
+                    // Play exactly as the implemented card: inherit its type,
+                    // on-triggers and passives. Only art + name + copies (and
+                    // optionally the printed rules text) are the user's.
+                    out.push({
+                        set: p.id,
+                        title: c.title,
+                        type: base.type,
+                        image: c.image,
+                        count: count,
+                        description: {
+                            en: c.description || (base.description && base.description.en) || "",
+                            de: c.description || (base.description && base.description.de) || "",
+                        },
+                        // deep clone so nothing mutates the shared base definition
+                        on: base.on ? JSON.parse(JSON.stringify(base.on)) : [],
+                        passive: base.passive ? base.passive.slice() : undefined,
+                    });
+                    return;
+                }
+
+                // No "plays as" link -> use the chosen preset effect (or none).
                 var key = effectAllowed(c.type, c.effectKey) ? c.effectKey : "none";
                 var eff = EFFECTS[key] || EFFECTS.none;
                 out.push({
@@ -237,7 +312,7 @@ function buildCustomCardDefs(enabledIds) {
                     title: c.title,
                     type: c.type,
                     image: c.image, // "/uploads/<file>" -> imageLoader passes URLs through
-                    count: Math.max(1, Math.min(20, c.count || 1)),
+                    count: count,
                     description: { en: c.description || "", de: c.description || "" },
                     on: eff.build(),
                     passive: eff.passive,

@@ -12,9 +12,79 @@ import {
   isAuthError,
   readFileAsDataUrl,
   CARD_TYPE_LABELS,
+  BaseCard,
   EffectOption,
   StoredPack,
 } from './adminApi';
+
+// "Card_Art-Name.png" -> "Card Art Name", for prefilling / matching.
+const titleFromFilename = (name: string) =>
+  name
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+// like normalizeName but first drops an image extension, so "foo-bar.png" and
+// "Foo Bar" collapse to the same key.
+const imageKey = (s: string) =>
+  normalizeName(String(s || '').replace(/\.(png|jpe?g|webp|gif)$/i, ''));
+
+const buildBaseCardIndex = (cards: BaseCard[]) => {
+  const idx: Record<string, BaseCard> = {};
+  cards.forEach((c) => {
+    idx[normalizeName(c.title)] = c;
+  });
+  return idx;
+};
+
+const matchBaseCard = (
+  name: string,
+  index: Record<string, BaseCard>
+): BaseCard | undefined => index[normalizeName(name)];
+
+// Minimal CSV parser: handles quoted fields, escaped quotes, CRLF.
+const parseCsv = (text: string): string[][] => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((r) => r.some((c) => c.trim() !== ''));
+};
 
 type View = 'loading' | 'login' | 'change-password' | 'dashboard';
 
@@ -26,6 +96,7 @@ const AdminPanel = () => {
   const [packs, setPacks] = useState<StoredPack[]>([]);
   const [effects, setEffects] = useState<EffectOption[]>([]);
   const [cardTypes, setCardTypes] = useState<string[]>([]);
+  const [baseCards, setBaseCards] = useState<BaseCard[]>([]);
 
   const refresh = useCallback(async () => {
     const [state, eff] = await Promise.all([adminApi.state(), adminApi.effects()]);
@@ -33,6 +104,11 @@ const AdminPanel = () => {
     setEffects(eff.effects || []);
     setCardTypes(eff.cardTypes || []);
     setView(state.mustChangePassword ? 'change-password' : 'dashboard');
+    // catalog of implemented cards (best-effort; not fatal if it fails)
+    adminApi
+      .baseCards()
+      .then((r) => setBaseCards(r.cards || []))
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -258,6 +334,7 @@ const AdminPanel = () => {
             pack={pack}
             effects={effects}
             cardTypes={cardTypes}
+            baseCards={baseCards}
             onChanged={guardedRefresh}
             onError={(m) => setError(m)}
           />
@@ -310,16 +387,19 @@ const PackCard = ({
   pack,
   effects,
   cardTypes,
+  baseCards,
   onChanged,
   onError,
 }: {
   pack: StoredPack;
   effects: EffectOption[];
   cardTypes: string[];
+  baseCards: BaseCard[];
   onChanged: () => void;
   onError: (m: string) => void;
 }) => {
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<'one' | 'many'>('one');
 
   return (
     <SubPanel>
@@ -362,9 +442,11 @@ const PackCard = ({
                 <span>
                   {CARD_TYPE_LABELS[c.type] || c.type} · ×{c.count}
                 </span>
-                {c.effectKey && c.effectKey !== 'none' && (
+                {c.baseCardTitle ? (
+                  <EffTag>plays as {c.baseCardTitle}</EffTag>
+                ) : c.effectKey && c.effectKey !== 'none' ? (
                   <EffTag>{effects.find((e) => e.key === c.effectKey)?.label || c.effectKey}</EffTag>
-                )}
+                ) : null}
               </CardMeta>
               <DeleteX
                 type="button"
@@ -386,13 +468,32 @@ const PackCard = ({
         </CardGrid>
       )}
 
-      <AddCardForm
-        packId={pack.id}
-        effects={effects}
-        cardTypes={cardTypes}
-        onAdded={onChanged}
-        onError={onError}
-      />
+      <ModeTabs>
+        <ModeTab type="button" $active={mode === 'one'} onClick={() => setMode('one')}>
+          Add one card
+        </ModeTab>
+        <ModeTab type="button" $active={mode === 'many'} onClick={() => setMode('many')}>
+          Bulk upload
+        </ModeTab>
+      </ModeTabs>
+
+      {mode === 'one' ? (
+        <AddCardForm
+          packId={pack.id}
+          effects={effects}
+          cardTypes={cardTypes}
+          baseCards={baseCards}
+          onAdded={onChanged}
+          onError={onError}
+        />
+      ) : (
+        <BulkAddForm
+          packId={pack.id}
+          baseCards={baseCards}
+          onAdded={onChanged}
+          onError={onError}
+        />
+      )}
     </SubPanel>
   );
 };
@@ -402,12 +503,14 @@ const AddCardForm = ({
   packId,
   effects,
   cardTypes,
+  baseCards,
   onAdded,
   onError,
 }: {
   packId: string;
   effects: EffectOption[];
   cardTypes: string[];
+  baseCards: BaseCard[];
   onAdded: () => void;
   onError: (m: string) => void;
 }) => {
@@ -416,6 +519,7 @@ const AddCardForm = ({
   const [count, setCount] = useState('1');
   const [description, setDescription] = useState('');
   const [effectKey, setEffectKey] = useState('none');
+  const [baseCardTitle, setBaseCardTitle] = useState('');
   const [imageData, setImageData] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -424,9 +528,9 @@ const AddCardForm = ({
     () => effects.filter((e) => e.types.indexOf(type) !== -1),
     [effects, type]
   );
+  const linked = baseCards.find((b) => b.title === baseCardTitle);
 
   useEffect(() => {
-    // reset the effect if it isn't valid for the newly-chosen type
     if (!effectOptions.find((e) => e.key === effectKey)) {
       setEffectKey('none');
     }
@@ -463,12 +567,14 @@ const AddCardForm = ({
         count: Math.max(1, Math.min(20, parseInt(count, 10) || 1)),
         description: description.trim(),
         effectKey,
+        baseCardTitle: baseCardTitle || undefined,
         image: imageData,
       });
       setTitle('');
       setCount('1');
       setDescription('');
       setEffectKey('none');
+      setBaseCardTitle('');
       setImageData('');
       onAdded();
     } catch (err: any) {
@@ -486,16 +592,6 @@ const AddCardForm = ({
           <Field value={title} onChange={(e) => setTitle(e.target.value)} />
         </Label>
         <Label>
-          Type
-          <Select value={type} onChange={(e) => setType(e.target.value)}>
-            {typeOptions.map((t) => (
-              <option key={t} value={t}>
-                {CARD_TYPE_LABELS[t] || t}
-              </option>
-            ))}
-          </Select>
-        </Label>
-        <Label>
           Copies in deck
           <Field
             type="number"
@@ -503,24 +599,6 @@ const AddCardForm = ({
             max={20}
             value={count}
             onChange={(e) => setCount(e.target.value)}
-          />
-        </Label>
-        <Label style={{ gridColumn: '1 / -1' }}>
-          Effect
-          <Select value={effectKey} onChange={(e) => setEffectKey(e.target.value)}>
-            {effectOptions.map((e) => (
-              <option key={e.key} value={e.key}>
-                {e.label}
-              </option>
-            ))}
-          </Select>
-        </Label>
-        <Label style={{ gridColumn: '1 / -1' }}>
-          Rules text (shown on the card, optional)
-          <TextArea
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
           />
         </Label>
         <Label>
@@ -531,6 +609,54 @@ const AddCardForm = ({
             onChange={(e) => pickImage(e.target.files && e.target.files[0])}
           />
         </Label>
+
+        <Label style={{ gridColumn: '1 / -1' }}>
+          Plays as (full ability of a real card — optional)
+          <Select value={baseCardTitle} onChange={(e) => setBaseCardTitle(e.target.value)}>
+            <option value="">— custom / no built-in ability —</option>
+            {baseCards.map((b) => (
+              <option key={b.title} value={b.title}>
+                {b.title} ({CARD_TYPE_LABELS[b.type] || b.type})
+              </option>
+            ))}
+          </Select>
+        </Label>
+
+        {linked ? (
+          <LinkedNote style={{ gridColumn: '1 / -1' }}>
+            This card will behave exactly like <strong>{linked.title}</strong> — type{' '}
+            <strong>{CARD_TYPE_LABELS[linked.type] || linked.type}</strong>.
+            {linked.description ? <em> “{linked.description}”</em> : null}
+          </LinkedNote>
+        ) : (
+          <>
+            <Label>
+              Type
+              <Select value={type} onChange={(e) => setType(e.target.value)}>
+                {typeOptions.map((t) => (
+                  <option key={t} value={t}>
+                    {CARD_TYPE_LABELS[t] || t}
+                  </option>
+                ))}
+              </Select>
+            </Label>
+            <Label style={{ gridColumn: 'span 2' }}>
+              Preset effect
+              <Select value={effectKey} onChange={(e) => setEffectKey(e.target.value)}>
+                {effectOptions.map((e) => (
+                  <option key={e.key} value={e.key}>
+                    {e.label}
+                  </option>
+                ))}
+              </Select>
+            </Label>
+          </>
+        )}
+
+        <Label style={{ gridColumn: '1 / -1' }}>
+          Rules text (shown on the card, optional)
+          <TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Label>
         {imageData && <Preview src={imageData} alt="preview" />}
         <div style={{ gridColumn: '1 / -1' }}>
           <Button type="submit" disabled={busy}>
@@ -539,6 +665,322 @@ const AddCardForm = ({
         </div>
       </AddGrid>
     </form>
+  );
+};
+
+// ------------------------------------------------------------------ bulk upload
+type StagedCard = {
+  key: string;
+  fileName: string;
+  dataUrl: string;
+  title: string;
+  baseCardTitle: string;
+  count: string;
+  description: string;
+  status: 'pending' | 'uploading' | 'done' | 'error';
+  error?: string;
+};
+
+const BulkAddForm = ({
+  packId,
+  baseCards,
+  onAdded,
+  onError,
+}: {
+  packId: string;
+  baseCards: BaseCard[];
+  onAdded: () => void;
+  onError: (m: string) => void;
+}) => {
+  const [rows, setRows] = useState<StagedCard[]>([]);
+  const [running, setRunning] = useState(false);
+  const [countForAll, setCountForAll] = useState('1');
+  const baseIndex = useMemo(() => buildBaseCardIndex(baseCards), [baseCards]);
+
+  const setRow = (key: string, patch: Partial<StagedCard>) =>
+    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+
+  const addFiles = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    onError('');
+    const staged: StagedCard[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (!/^image\//.test(f.type)) continue;
+      let dataUrl = '';
+      try {
+        dataUrl = await readFileAsDataUrl(f);
+      } catch {
+        continue;
+      }
+      const guess = titleFromFilename(f.name);
+      const match = matchBaseCard(guess, baseIndex);
+      staged.push({
+        key: `${Date.now()}_${i}_${f.name}`,
+        fileName: f.name,
+        dataUrl,
+        title: match ? match.title : guess,
+        baseCardTitle: match ? match.title : '',
+        count: '1',
+        description: '',
+        status: 'pending',
+      });
+    }
+    setRows((rs) => [...rs, ...staged]);
+  };
+
+  const autoMatchAll = () =>
+    setRows((rs) =>
+      rs.map((r) => {
+        const m = matchBaseCard(r.title, baseIndex);
+        return m ? { ...r, baseCardTitle: m.title, title: m.title } : r;
+      })
+    );
+
+  const applyCountAll = () =>
+    setRows((rs) => rs.map((r) => ({ ...r, count: countForAll })));
+
+  // CSV: match a row by an "image"/"filename"/"name" column, fill title/rules/count.
+  const importCsv = async (file?: File | null) => {
+    if (!file) return;
+    onError('');
+    let text = '';
+    try {
+      text = await file.text();
+    } catch {
+      onError('Could not read the CSV file.');
+      return;
+    }
+    const table = parseCsv(text);
+    if (table.length < 2) {
+      onError('That CSV looks empty.');
+      return;
+    }
+    const header = table[0].map((h) => h.trim().toLowerCase());
+    const col = (...names: string[]) => {
+      for (let k = 0; k < names.length; k++) {
+        const i = header.indexOf(names[k]);
+        if (i !== -1) return i;
+      }
+      return -1;
+    };
+    const ci = {
+      name: col('name', 'title', 'card', 'card name'),
+      image: col('image', 'image_file', 'imagefile', 'filename', 'file'),
+      rules: col('effect', 'rules', 'description', 'text', 'ability'),
+      count: col('count', 'copies', 'qty', 'quantity'),
+      playsAs: col('plays as', 'plays_as', 'base', 'basecard', 'template'),
+    };
+    const byFile: Record<string, string[]> = {};
+    const byName: Record<string, string[]> = {};
+    for (let i = 1; i < table.length; i++) {
+      if (ci.image !== -1) byFile[imageKey(table[i][ci.image] || '')] = table[i];
+      if (ci.name !== -1) byName[normalizeName(table[i][ci.name] || '')] = table[i];
+    }
+
+    setRows((rs) =>
+      rs.map((r) => {
+        const rec =
+          (ci.image !== -1 && byFile[imageKey(r.fileName)]) || byName[normalizeName(r.title)];
+        if (!rec) return r;
+        const next = { ...r };
+        if (ci.name !== -1 && rec[ci.name]) next.title = rec[ci.name].trim();
+        if (ci.rules !== -1 && rec[ci.rules]) next.description = rec[ci.rules].trim();
+        if (ci.count !== -1 && rec[ci.count] && /^\d+$/.test(rec[ci.count].trim()))
+          next.count = rec[ci.count].trim();
+        const playsAsName =
+          (ci.playsAs !== -1 && rec[ci.playsAs]) || next.title;
+        const m = matchBaseCard(playsAsName, baseIndex);
+        if (m) next.baseCardTitle = m.title;
+        return next;
+      })
+    );
+  };
+
+  const uploadAll = async () => {
+    onError('');
+    setRunning(true);
+    const queue = rows.filter((r) => r.status !== 'done');
+    for (let i = 0; i < queue.length; i++) {
+      const r = queue[i];
+      setRow(r.key, { status: 'uploading', error: undefined });
+      try {
+        await adminApi.addCard(packId, {
+          title: r.title.trim() || titleFromFilename(r.fileName),
+          type: 'basic', // ignored by the server when baseCardTitle is set
+          count: Math.max(1, Math.min(20, parseInt(r.count, 10) || 1)),
+          description: r.description.trim(),
+          effectKey: 'none',
+          baseCardTitle: r.baseCardTitle || undefined,
+          image: r.dataUrl,
+        });
+        setRow(r.key, { status: 'done' });
+      } catch (e: any) {
+        setRow(r.key, { status: 'error', error: e.message || 'Failed' });
+      }
+    }
+    setRunning(false);
+    setRows((rs) => rs.filter((r) => r.status !== 'done'));
+    onAdded();
+  };
+
+  const doneCount = rows.filter((r) => r.status === 'done').length;
+  const errCount = rows.filter((r) => r.status === 'error').length;
+
+  return (
+    <div>
+      <BulkBar>
+        <label>
+          <Button as="span">Choose images…</Button>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              addFiles(e.target.files);
+              e.currentTarget.value = '';
+            }}
+          />
+        </label>
+        <label>
+          <Button as="span" $variant="ghost">
+            Import CSV…
+          </Button>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              importCsv(e.target.files && e.target.files[0]);
+              e.currentTarget.value = '';
+            }}
+          />
+        </label>
+        {rows.length > 0 && (
+          <>
+            <TextButton type="button" onClick={autoMatchAll}>
+              Auto-match names → real cards
+            </TextButton>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Field
+                type="number"
+                min={1}
+                max={20}
+                value={countForAll}
+                onChange={(e) => setCountForAll(e.target.value)}
+                style={{ width: 64, minHeight: 34, padding: '0.3em 0.5em', letterSpacing: 'normal' }}
+              />
+              <TextButton type="button" onClick={applyCountAll}>
+                set count for all
+              </TextButton>
+            </span>
+            <TextButton type="button" onClick={() => setRows([])}>
+              clear
+            </TextButton>
+          </>
+        )}
+      </BulkBar>
+
+      {rows.length === 0 && (
+        <Muted>
+          Pick several card images at once. Each becomes a card; if the filename matches a real
+          Unstable Unicorns card it's auto-linked so it plays with that card's full ability. Adjust
+          rows below, then upload.
+        </Muted>
+      )}
+
+      {rows.length > 0 && (
+        <>
+          <BulkTable>
+            <thead>
+              <tr>
+                <th />
+                <th>Name</th>
+                <th>Plays as (ability)</th>
+                <th>×</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key} data-status={r.status}>
+                  <td>
+                    <RowThumb src={r.dataUrl} alt="" />
+                  </td>
+                  <td>
+                    <Field
+                      value={r.title}
+                      onChange={(e) => setRow(r.key, { title: e.target.value })}
+                      style={{ minHeight: 34, padding: '0.3em 0.5em', letterSpacing: 'normal', fontSize: 13 }}
+                    />
+                  </td>
+                  <td>
+                    <Select
+                      value={r.baseCardTitle}
+                      onChange={(e) => setRow(r.key, { baseCardTitle: e.target.value })}
+                      style={{ minHeight: 34, padding: '0.3em 0.5em', fontSize: 13 }}
+                    >
+                      <option value="">— plain card (no ability) —</option>
+                      {baseCards.map((b) => (
+                        <option key={b.title} value={b.title}>
+                          {b.title} ({CARD_TYPE_LABELS[b.type] || b.type})
+                        </option>
+                      ))}
+                    </Select>
+                  </td>
+                  <td>
+                    <Field
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={r.count}
+                      onChange={(e) => setRow(r.key, { count: e.target.value })}
+                      style={{ width: 52, minHeight: 34, padding: '0.3em 0.4em', letterSpacing: 'normal' }}
+                    />
+                  </td>
+                  <td>
+                    <RowStatus data-s={r.status}>
+                      {r.status === 'uploading'
+                        ? '…'
+                        : r.status === 'done'
+                        ? '✓'
+                        : r.status === 'error'
+                        ? '!'
+                        : ''}
+                    </RowStatus>
+                    <DeleteX
+                      type="button"
+                      style={{ position: 'static' }}
+                      onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                    >
+                      ×
+                    </DeleteX>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </BulkTable>
+          {errCount > 0 && (
+            <ErrorText>
+              {errCount} card{errCount === 1 ? '' : 's'} failed:{' '}
+              {rows
+                .filter((r) => r.status === 'error')
+                .map((r) => `${r.title} (${r.error})`)
+                .join('; ')}
+            </ErrorText>
+          )}
+          <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+            <Button type="button" disabled={running || rows.length === 0} onClick={uploadAll}>
+              {running
+                ? `Uploading… ${doneCount}/${rows.length}`
+                : `Add ${rows.length} card${rows.length === 1 ? '' : 's'}`}
+            </Button>
+            {running && <Muted style={{ margin: 0 }}>Keep this tab open.</Muted>}
+          </div>
+        </>
+      )}
+    </div>
   );
 };
 
@@ -581,6 +1023,92 @@ const AddGrid = styled.div`
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
+`;
+
+const ModeTabs = styled.div`
+  display: flex;
+  gap: 6px;
+  margin: 18px 0 4px;
+`;
+
+const ModeTab = styled.button<{ $active: boolean }>`
+  border: 1px solid ${COLORS.panelBorder};
+  background: ${(p) => (p.$active ? 'rgba(124,92,255,0.35)' : 'transparent')};
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0.45em 0.9em;
+  border-radius: 999px;
+  cursor: pointer;
+`;
+
+const LinkedNote = styled.div`
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: ${COLORS.textMuted};
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-radius: 10px;
+  padding: 8px 10px;
+  strong {
+    color: #a5f3fc;
+  }
+`;
+
+const BulkBar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 12px 0;
+`;
+
+const BulkTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th {
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: ${COLORS.textMuted};
+    padding: 4px 6px;
+  }
+  td {
+    padding: 4px 6px;
+    vertical-align: middle;
+    border-top: 1px solid ${COLORS.panelBorder};
+  }
+  tr[data-status='error'] td {
+    background: rgba(255, 77, 109, 0.1);
+  }
+  tr[data-status='done'] td {
+    opacity: 0.5;
+  }
+`;
+
+const RowThumb = styled.img`
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+`;
+
+const RowStatus = styled.span`
+  display: inline-block;
+  width: 18px;
+  text-align: center;
+  font-weight: 800;
+  color: ${COLORS.textMuted};
+  &[data-s='done'] {
+    color: #37d9a0;
+  }
+  &[data-s='error'] {
+    color: #ff6b6b;
+  }
 `;
 
 const HeaderRow = styled.div`

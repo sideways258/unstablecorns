@@ -1901,6 +1901,13 @@ function initializeDeck(enabledSets) {
     return deck.map(function (c, idx) { return (__assign(__assign({}, c), { id: idx })); });
 }
 exports.initializeDeck = initializeDeck;
+// Every fully-implemented card definition (base game + built-in homebrew packs).
+// Used by the admin panel so an uploaded card can be told to "play as" one of
+// these - inheriting its real type / on-triggers / passives, just with new art.
+function getAllCardDefs() {
+    return Cards.concat(expansions_1.EXPANSION_CARDS);
+}
+exports.getAllCardDefs = getAllCardDefs;
 // Helper
 function isUnicorn(card) {
     return card.type === "baby" || card.type === "basic" || card.type === "unicorn" || card.type === "narwhal";

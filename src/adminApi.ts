@@ -10,8 +10,12 @@ export type StoredCard = {
   count: number;
   description: string;
   effectKey: string;
+  /** If set, the card plays with the full mechanics of this implemented card. */
+  baseCardTitle?: string;
   image: string;
 };
+
+export type BaseCard = { title: string; type: string; description: string };
 
 export type StoredPack = {
   id: string;
@@ -93,6 +97,8 @@ export const adminApi = {
 
   effects: () => req<{ effects: EffectOption[]; cardTypes: string[] }>('/api/admin/effects'),
 
+  baseCards: () => req<{ cards: BaseCard[] }>('/api/admin/base-cards'),
+
   createPack: (name: string, blurb: string) =>
     req<{ pack: StoredPack }>('/api/admin/packs', {
       method: 'POST',
@@ -109,6 +115,7 @@ export const adminApi = {
       count: number;
       description: string;
       effectKey: string;
+      baseCardTitle?: string;
       image: string;
     }
   ) =>
