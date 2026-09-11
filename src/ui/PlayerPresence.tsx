@@ -127,14 +127,15 @@ const PlayerPresence = (props: any) => {
 const Root = styled.div`
   position: fixed;
   top: max(14px, env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
+  left: max(14px, env(safe-area-inset-left));
   z-index: 6000;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  width: calc(100vw - 24px);
+  width: min(260px, calc(50vw - 24px));
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
   pointer-events: none;
 `;
 
