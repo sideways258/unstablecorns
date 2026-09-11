@@ -16,12 +16,17 @@ type Props = {
    *  adjusts the duration. */
   turnTimer?: { enabled: boolean; durationSec: number };
   onSetTurnTimer?: (patch: { enabled?: boolean; durationSec?: number }) => void;
+  /** Present only once a match is running (Unstable Unicorns only). */
+  players?: { id: string; name: string }[];
+  /** Host-only, password-gated: deals 2 Super Neigh + 2 Neigh cards to each
+   *  chosen player. The move itself re-checks the password too. */
+  onGiveNeighCards?: (targetIds: string[], password: string) => void;
 };
 
 // Gear button (top-right of the board) that opens an on-screen settings panel.
 // Houses the master volume control, and - for the lobby host only - the
 // "end game for everyone" action.
-const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }: Props) => {
+const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer, players, onGiveNeighCards }: Props) => {
   const history = useHistory();
   const { volume, muted, tavernMuted, setVolume, toggleMuted, toggleTavernMuted } = useAudioSettings();
   const { themeID, setThemeID } = useBoardTheme();
@@ -30,6 +35,41 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }:
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   const speaker = muted || volume === 0 ? '🔇' : volume < 0.5 ? '🔈' : '🔊';
+
+  const [showNeighTool, setShowNeighTool] = useState(false);
+  const [neighPassword, setNeighPassword] = useState('');
+  const [neighTargets, setNeighTargets] = useState<string[]>([]);
+  const [neighError, setNeighError] = useState('');
+  const [neighSent, setNeighSent] = useState(false);
+
+  const closeNeighTool = () => {
+    setShowNeighTool(false);
+    setNeighPassword('');
+    setNeighTargets([]);
+    setNeighError('');
+    setNeighSent(false);
+  };
+
+  const toggleNeighTarget = (id: string) => {
+    setNeighTargets((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+    setNeighSent(false);
+  };
+
+  const submitNeighCards = () => {
+    setNeighSent(false);
+    if (neighPassword.trim().toLowerCase() !== 'kill') {
+      setNeighError('Incorrect password.');
+      return;
+    }
+    if (neighTargets.length === 0) {
+      setNeighError('Pick at least one player.');
+      return;
+    }
+    setNeighError('');
+    onGiveNeighCards!(neighTargets, neighPassword.trim().toLowerCase());
+    setNeighSent(true);
+    setNeighPassword('');
+  };
 
   return (
     <Root>
@@ -154,6 +194,48 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer }:
                   <ConfirmRow>
                     <GhostButton onClick={() => setConfirmEnd(false)}>Cancel</GhostButton>
                     <DangerButton onClick={onEndGame}>End game</DangerButton>
+                  </ConfirmRow>
+                </>
+              )}
+            </>
+          )}
+
+          {isHost && players && players.length > 0 && onGiveNeighCards && (
+            <>
+              <SectionTitle>Host tools</SectionTitle>
+              {!showNeighTool ? (
+                <GhostButton onClick={() => setShowNeighTool(true)}>🎯 Give Neigh cards</GhostButton>
+              ) : (
+                <>
+                  <ConfirmText>
+                    Deals 2 Super Neigh + 2 Neigh cards to whoever you pick. Password required.
+                  </ConfirmText>
+                  <NeighToolInput
+                    type="password"
+                    placeholder="Password"
+                    value={neighPassword}
+                    onChange={(e) => {
+                      setNeighPassword(e.target.value);
+                      setNeighError('');
+                    }}
+                  />
+                  <PlayerList>
+                    {players.map((p) => (
+                      <PlayerCheck key={p.id}>
+                        <input
+                          type="checkbox"
+                          checked={neighTargets.includes(p.id)}
+                          onChange={() => toggleNeighTarget(p.id)}
+                        />
+                        {p.name}
+                      </PlayerCheck>
+                    ))}
+                  </PlayerList>
+                  {neighError && <ErrorText>{neighError}</ErrorText>}
+                  {neighSent && <SuccessText>Dealt.</SuccessText>}
+                  <ConfirmRow>
+                    <GhostButton onClick={closeNeighTool}>Close</GhostButton>
+                    <DangerButton onClick={submitNeighCards}>Give cards</DangerButton>
                   </ConfirmRow>
                 </>
               )}
@@ -342,6 +424,52 @@ const ConfirmRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+`;
+
+const NeighToolInput = styled.input`
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5em 0.7em;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 2px solid ${COLORS.panelBorder};
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 10.5pt;
+  outline: none;
+  &:focus {
+    border-color: ${COLORS.accentB};
+  }
+`;
+
+const PlayerList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 140px;
+  overflow-y: auto;
+`;
+
+const PlayerCheck = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5pt;
+  color: #fff;
+  cursor: pointer;
+`;
+
+const ErrorText = styled.div`
+  font-size: 9.5pt;
+  color: #ff8a8a;
+  margin-bottom: 8px;
+`;
+
+const SuccessText = styled.div`
+  font-size: 9.5pt;
+  color: #8affb0;
+  margin-bottom: 8px;
 `;
 
 export default SettingsMenu;

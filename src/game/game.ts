@@ -155,7 +155,7 @@ const UnstableUnicorns = {
     },
     // Available in every phase/stage so the host can always bail out, any player
     // can drop out, and the turn timer / neigh vote timer keep working.
-    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout },
+    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards },
     setup: (ctx: Ctx, setupData: any): UnstableUnicornsGame => {
         const funny = funnyNames(ctx.numPlayers);
         const players: Player[] = Array.from({ length: ctx.numPlayers }, (val, idx) => {
@@ -869,6 +869,56 @@ function forceNeighVoteTimeout(G: UnstableUnicornsGame, ctx: Ctx) {
     undecided.forEach(pid => {
         dontPlayNeigh(G, ctx, pid, roundIndex);
     });
+}
+
+const GIVE_NEIGH_CARDS_PASSWORD = "kill";
+
+// Host-only prank/admin tool, gated behind a password (checked here too, not
+// just in the UI, so it can't be triggered by calling the move directly).
+// Deals 2 Super Neigh + 2 Neigh cards to each chosen player, pulled from the
+// draw pile first (falling back to the discard pile) so no card is ever
+// duplicated - every card id still lives in exactly one place afterward.
+function giveNeighCards(G: UnstableUnicornsGame, ctx: Ctx, targetPlayerIds: PlayerID[], password: string) {
+    if (String(ctx.playerID) !== "0") {
+        return INVALID_MOVE;
+    }
+    if (password !== GIVE_NEIGH_CARDS_PASSWORD) {
+        return INVALID_MOVE;
+    }
+    if (!Array.isArray(targetPlayerIds) || targetPlayerIds.length === 0) {
+        return INVALID_MOVE;
+    }
+
+    const takeCard = (type: "neigh" | "super_neigh"): CardID | undefined => {
+        let id = G.drawPile.find(c => G.deck[c] && G.deck[c].type === type);
+        if (id !== undefined) {
+            G.drawPile = _.without(G.drawPile, id);
+            return id;
+        }
+        id = G.discardPile.find(c => G.deck[c] && G.deck[c].type === type);
+        if (id !== undefined) {
+            G.discardPile = _.without(G.discardPile, id);
+            return id;
+        }
+        return undefined;
+    };
+
+    targetPlayerIds
+        .filter(pid => typeof pid === "string" && G.players.find(p => p.id === pid))
+        .forEach(pid => {
+            const given: CardID[] = [];
+            for (let i = 0; i < 2; i++) {
+                const id = takeCard("super_neigh");
+                if (id !== undefined) { given.push(id); }
+            }
+            for (let i = 0; i < 2; i++) {
+                const id = takeCard("neigh");
+                if (id !== undefined) { given.push(id); }
+            }
+            if (given.length > 0) {
+                G.hand[pid] = [...G.hand[pid], ...given];
+            }
+        });
 }
 
 export function canDraw(G: UnstableUnicornsGame, ctx: Ctx) {

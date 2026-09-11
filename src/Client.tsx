@@ -58,6 +58,18 @@ const GameClient = ({ debug }: Props) => {
                             boardProps.moves.setTurnTimer &&
                             boardProps.moves.setTurnTimer(patch)
                         }
+                        players={
+                            boardProps.moves && boardProps.moves.giveNeighCards && boardProps.G && boardProps.G.players
+                                ? boardProps.G.players.filter(
+                                      (p: any) => (boardProps.G.leftPlayers || []).indexOf(p.id) === -1
+                                  )
+                                : undefined
+                        }
+                        onGiveNeighCards={(targetIds: string[], password: string) =>
+                            boardProps.moves &&
+                            boardProps.moves.giveNeighCards &&
+                            boardProps.moves.giveNeighCards(targetIds, password)
+                        }
                     />
                     <TurnTimer {...boardProps} />
                     <AuditLog {...boardProps} />

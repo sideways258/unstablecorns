@@ -73,6 +73,26 @@ const NeighLabel = (props: Props) => {
         ? Math.max(0, Math.ceil((voteTimeoutStartedAt + voteTimeoutDurationSec * 1000 - now) / 1000))
         : undefined;
 
+    // Optimistic "starting…" state + a visible failure if the server never
+    // confirms (e.g. a stale deploy that doesn't know this move yet) - without
+    // this, a rejected/ignored move looked identical to "nothing happened".
+    const [startPending, setStartPending] = useState(false);
+    const [startFailed, setStartFailed] = useState(false);
+    useEffect(() => {
+        if (voteTimeoutStartedAt) {
+            setStartPending(false);
+            setStartFailed(false);
+        }
+    }, [voteTimeoutStartedAt]);
+    useEffect(() => {
+        if (!startPending) return;
+        const id = setTimeout(() => {
+            setStartPending(false);
+            setStartFailed(true);
+        }, 4000);
+        return () => clearTimeout(id);
+    }, [startPending]);
+
     const onText = props.targetName && props.targetName !== props.originalInitiatorName ? ` on ${props.targetName}` : "";
     const names = props.playerNames && props.playerNames.length > 0
         ? props.playerNames
@@ -183,14 +203,22 @@ const NeighLabel = (props: Props) => {
                         </PendingChips>
                         {voteTimeoutSecsLeft === undefined && props.isHost && props.onStartVoteTimer && (
                             <TimerButton
+                                disabled={startPending}
                                 onClick={() => {
+                                    setStartPending(true);
+                                    setStartFailed(false);
                                     props.onStartVoteTimer!();
                                     playMouseClick();
                                 }}
                                 title="Auto-select &ldquo;don't neigh&rdquo; for anyone who hasn't voted after the countdown"
                             >
-                                ⏱ Start timer
+                                {startPending ? 'Starting…' : '⏱ Start timer'}
                             </TimerButton>
+                        )}
+                        {startFailed && (
+                            <TimerErrorText>
+                                Timer didn&rsquo;t start — the server may be out of date. Try again, or ask everyone to hard-refresh.
+                            </TimerErrorText>
                         )}
                     </Pending>
                 )}
@@ -375,6 +403,17 @@ const TimerButton = styled.button`
     white-space: nowrap;
     &:hover { filter: brightness(1.1); }
     &:active { transform: translateY(1px); }
+    &:disabled {
+        cursor: default;
+        opacity: 0.7;
+        filter: none;
+    }
+`;
+
+const TimerErrorText = styled.div`
+    flex: 1 1 100%;
+    font-size: 9.5pt;
+    color: #ff8a8a;
 `;
 
 export default NeighLabel;

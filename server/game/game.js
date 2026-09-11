@@ -52,7 +52,7 @@ var UnstableUnicorns = {
     },
     // Available in every phase/stage so the host can always bail out, any player
     // can drop out, and the turn timer keeps working.
-    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout },
+    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards },
     setup: function (ctx, setupData) {
         var funny = funnyNames_1.funnyNames(ctx.numPlayers);
         var players = Array.from({ length: ctx.numPlayers }, function (val, idx) {
@@ -707,6 +707,52 @@ function forceNeighVoteTimeout(G, ctx) {
     undecided.forEach(function (pid) {
         dontPlayNeigh(G, ctx, pid, roundIndex);
     });
+}
+var GIVE_NEIGH_CARDS_PASSWORD = "kill";
+// Host-only prank/admin tool, gated behind a password (checked here too, not
+// just in the UI, so it can't be triggered by calling the move directly).
+// Deals 2 Super Neigh + 2 Neigh cards to each chosen player, pulled from the
+// draw pile first (falling back to the discard pile) so no card is ever
+// duplicated - every card id still lives in exactly one place afterward.
+function giveNeighCards(G, ctx, targetPlayerIds, password) {
+    if (String(ctx.playerID) !== "0") {
+        return core_1.INVALID_MOVE;
+    }
+    if (password !== GIVE_NEIGH_CARDS_PASSWORD) {
+        return core_1.INVALID_MOVE;
+    }
+    if (!Array.isArray(targetPlayerIds) || targetPlayerIds.length === 0) {
+        return core_1.INVALID_MOVE;
+    }
+    var takeCard = function (type) {
+        var id = G.drawPile.find(function (c) { return G.deck[c] && G.deck[c].type === type; });
+        if (id !== undefined) {
+            G.drawPile = underscore_1["default"].without(G.drawPile, id);
+            return id;
+        }
+        id = G.discardPile.find(function (c) { return G.deck[c] && G.deck[c].type === type; });
+        if (id !== undefined) {
+            G.discardPile = underscore_1["default"].without(G.discardPile, id);
+            return id;
+        }
+        return undefined;
+    };
+    targetPlayerIds
+        .filter(function (pid) { return typeof pid === "string" && G.players.find(function (p) { return p.id === pid; }); })
+        .forEach(function (pid) {
+            var given = [];
+            for (var i = 0; i < 2; i++) {
+                var id = takeCard("super_neigh");
+                if (id !== undefined) { given.push(id); }
+            }
+            for (var j = 0; j < 2; j++) {
+                var id2 = takeCard("neigh");
+                if (id2 !== undefined) { given.push(id2); }
+            }
+            if (given.length > 0) {
+                G.hand[pid] = __spreadArrays(G.hand[pid], given);
+            }
+        });
 }
 function canDraw(G, ctx) {
     if (G.mustEndTurnImmediately === true) {
