@@ -8,7 +8,6 @@ import BackButton from './ui/BackButton';
 import PlayerPresence from './ui/PlayerPresence';
 import SettingsMenu from './ui/SettingsMenu';
 import TurnTimer from './ui/TurnTimer';
-import GameTimer from './ui/GameTimer';
 import AuditLog from './ui/AuditLog';
 
 type RouteParam = {
@@ -82,7 +81,6 @@ const GameClient = ({ debug }: Props) => {
                         kickVoteActive={!!(boardProps.G && boardProps.G.kickVote)}
                     />
                     <TurnTimer {...boardProps} />
-                    <GameTimer gameStartedAt={boardProps.G && boardProps.G.gameStartedAt} />
                     <AuditLog {...boardProps} />
                     <PlayerPresence {...boardProps} />
                 </>

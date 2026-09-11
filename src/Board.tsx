@@ -25,6 +25,7 @@ import { BoardState, getBoardState } from './BoardStateManager';
 import GameLabel from './ui/GameLabel';
 import NeighLabel, { NeighLabelRole } from './ui/NeighLabel';
 import KickVoteLabel from './ui/KickVoteLabel';
+import GameTimer from './ui/GameTimer';
 import CardPopupSingleAction from './ui/CardPopupSingleAction';
 import { AddFromDiscardPileToHandTarget, BringToStableTarget, DiscardTarget, DoDestroy, DoDiscard, findDestroyTargets, findDiscardTargets, ReviveTarget, SearchTarget } from './game/do';
 import InfoLabel from './ui/InfoLabel';
@@ -510,6 +511,7 @@ const Board = (props: any) => {
                 {C2CArrow !== undefined &&
                     <RainbowArrow from={{ x: C2CArrow!.fromX, y: C2CArrow!.fromY }} to={{ x: C2CArrow!.toX, y: C2CArrow!.toY }} />
                 }
+                <GameTimer gameStartedAt={G.gameStartedAt} />
                 <TurnOrderPanel>
                     {ctx.playOrder
                         .map((pos: string) => G.players.find(pl => pl.id === pos))
@@ -1318,7 +1320,7 @@ const Top = styled.div`
 
 const TurnOrderPanel = styled.div`
     position: absolute;
-    top: 60px;
+    top: 104px;
     right: 6px;
     bottom: 8px;
     width: 78px;

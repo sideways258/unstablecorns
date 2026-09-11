@@ -10,6 +10,11 @@ type Props = {
 // moment the match actually left the lobby (G.gameStartedAt, stamped once in
 // initializeGame - the same server timestamp every viewer's clock is anchored
 // to, same pattern as TurnTimer, so it doesn't drift out of sync).
+//
+// Rendered inside Board's own Wrapper (absolutely positioned, right above the
+// TurnOrderPanel/neigh-count column) rather than as a top-level fixed overlay
+// - that keeps it correctly aligned with that column even when the board is
+// scaled down (mobile), which a viewport-fixed element can't guarantee.
 const GameTimer = ({ gameStartedAt }: Props) => {
   const [now, setNow] = useState(() => Date.now());
 
@@ -39,26 +44,24 @@ const GameTimer = ({ gameStartedAt }: Props) => {
 };
 
 const Pill = styled.div`
-  position: fixed;
-  top: 106px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5400;
-  display: inline-flex;
+  position: absolute;
+  top: 60px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0.4em 0.9em;
-  border-radius: 999px;
-  border: 2px solid #fff;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.35em 0.6em;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
   color: #fff;
   font-family: ${FONT_DISPLAY};
   font-weight: 700;
-  font-size: 11pt;
+  font-size: 9.5pt;
   white-space: nowrap;
   background: rgba(20, 12, 34, 0.72);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.28), 0 12px 26px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28), 0 8px 18px rgba(0, 0, 0, 0.3);
 
   & b {
     font-variant-numeric: tabular-nums;
