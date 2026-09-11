@@ -59,7 +59,10 @@ const GameClient = ({ debug }: Props) => {
                             boardProps.moves.setTurnTimer(patch)
                         }
                         players={
-                            boardProps.moves && boardProps.moves.giveNeighCards && boardProps.G && boardProps.G.players
+                            boardProps.moves &&
+                            (boardProps.moves.giveNeighCards || boardProps.moves.startKickVote) &&
+                            boardProps.G &&
+                            boardProps.G.players
                                 ? boardProps.G.players.filter(
                                       (p: any) => (boardProps.G.leftPlayers || []).indexOf(p.id) === -1
                                   )
@@ -70,6 +73,12 @@ const GameClient = ({ debug }: Props) => {
                             boardProps.moves.giveNeighCards &&
                             boardProps.moves.giveNeighCards(targetIds, password)
                         }
+                        onStartKickVote={(targetId: string) =>
+                            boardProps.moves &&
+                            boardProps.moves.startKickVote &&
+                            boardProps.moves.startKickVote(targetId)
+                        }
+                        kickVoteActive={!!(boardProps.G && boardProps.G.kickVote)}
                     />
                     <TurnTimer {...boardProps} />
                     <AuditLog {...boardProps} />

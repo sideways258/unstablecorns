@@ -8,7 +8,7 @@ import useSound, { useTavernSound } from './audio';
 import { useBoardTheme } from './boardTheme';
 import { motion, AnimateSharedLayout, AnimatePresence } from "framer-motion";
 // game
-import { UnstableUnicornsGame, Ctx, _findOpenScenesWithProtagonist, Instruction, Scene, canDraw, canPlayCard, _findInProgressScenesWithProtagonist, _findInstruction, _countUnicorns } from './game/game';
+import { UnstableUnicornsGame, Ctx, _findOpenScenesWithProtagonist, Instruction, Scene, canDraw, canPlayCard, _findInProgressScenesWithProtagonist, _findInstruction, _countUnicorns, _activePlayers } from './game/game';
 import { CONSTANTS } from './game/constants';
 // assets
 import UpgradeDowngradeStable from './ui/UpgradeDowngradeStable';
@@ -24,6 +24,7 @@ import { PlayerID } from './game/player';
 import { BoardState, getBoardState } from './BoardStateManager';
 import GameLabel from './ui/GameLabel';
 import NeighLabel, { NeighLabelRole } from './ui/NeighLabel';
+import KickVoteLabel from './ui/KickVoteLabel';
 import CardPopupSingleAction from './ui/CardPopupSingleAction';
 import { AddFromDiscardPileToHandTarget, BringToStableTarget, DiscardTarget, DoDestroy, DoDiscard, findDestroyTargets, findDiscardTargets, ReviveTarget, SearchTarget } from './game/do';
 import InfoLabel from './ui/InfoLabel';
@@ -646,6 +647,7 @@ const Board = (props: any) => {
                         }} isGlowing={boardStates.find(s => s.type === "drawCard" || s.type === "draw__clickOnDrawPile") !== undefined} count={G.drawPile.length} />
                     </DrawPileWrapper>
                     {renderNeighLabel(G, ctx, moves, playerID)}
+                    {renderKickVoteLabel(G, ctx, moves, playerID)}
 
                     {renderInfoLabel(G, ctx, playerID, boardStates)}
                     <MiddleLeftWrapper zIndexFocus={isHoveringOverHandCard}>
@@ -1038,6 +1040,36 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
     );
 }
 
+const renderKickVoteLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerID: PlayerID) => {
+    if (!G.kickVote) {
+        return null;
+    }
+
+    const target = G.players.find(p => p.id === G.kickVote!.targetPlayerID);
+    const targetName = (target && target.name) || `Player ${G.kickVote.targetPlayerID}`;
+    const eligible = _activePlayers(G).map(p => p.id).filter(id => id !== G.kickVote!.targetPlayerID);
+    const votes = G.kickVote.votes;
+    const yesCount = eligible.filter(id => votes[id] === "yes").length;
+    const noCount = eligible.filter(id => votes[id] === "no").length;
+    const myVote = votes[playerID];
+    const pendingCount = eligible.filter(id => !votes[id]).length;
+
+    return (
+        <KickVoteLabel
+            targetName={targetName}
+            isTarget={playerID === G.kickVote.targetPlayerID}
+            myVote={myVote}
+            yesCount={yesCount}
+            noCount={noCount}
+            pendingCount={pendingCount}
+            isHost={String(playerID) === "0"}
+            onVoteYes={() => moves.castKickVote("yes")}
+            onVoteNo={() => moves.castKickVote("no")}
+            onCancel={String(playerID) === "0" ? () => moves.cancelKickVote() : undefined}
+        />
+    );
+}
+
 const renderTop = (G: UnstableUnicornsGame, ctx: Ctx, isCurrentPlayer: boolean, boardStates: BoardState[]) => {
     if (isCurrentPlayer) {
         // "whose turn" is already shown by <TurnIndicator>; only surface the
@@ -1342,6 +1374,12 @@ const Main = styled.div`
     width: 1000px;
     margin-top: 68px;
     z-index: 1;
+    /* Pull the opponents' stables up into the empty band above the deck/
+       nursery/discard row instead of sitting low enough to run into the
+       current player's own Upgrades/Downgrades stable at the bottom of the
+       table - this is a visual-only shift (transform), so it doesn't change
+       where Middle/Bottom are positioned. */
+    transform: translateY(-150px);
 `;
 
 const Middle = styled.div`

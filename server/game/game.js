@@ -52,7 +52,7 @@ var UnstableUnicorns = {
     },
     // Available in every phase/stage so the host can always bail out, any player
     // can drop out, and the turn timer keeps working.
-    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards },
+    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote },
     setup: function (ctx, setupData) {
         var funny = funnyNames_1.funnyNames(ctx.numPlayers);
         var players = Array.from({ length: ctx.numPlayers }, function (val, idx) {
@@ -357,7 +357,6 @@ function endMatch(G, ctx) {
 // A player leaves for good. Their turn, their cards, and every action they still
 // owe are removed so the game never stalls waiting on someone who is gone.
 function playerLeft(G, ctx, leaverID) {
-    var _a;
     var pid = (leaverID !== undefined && leaverID !== null) ? String(leaverID) : ctx.playerID;
     if (pid === undefined || G.players.find(function (p) { return p.id === pid; }) === undefined) {
         return core_1.INVALID_MOVE;
@@ -366,11 +365,16 @@ function playerLeft(G, ctx, leaverID) {
     if (ctx.playerID != null && pid !== String(ctx.playerID)) {
         return core_1.INVALID_MOVE;
     }
+    _removePlayerFromGame(G, ctx, pid, "left the game");
+}
+// Shared by the self-service "leave" move and a resolved kick vote.
+function _removePlayerFromGame(G, ctx, pid, logText) {
+    var _a;
     if (G.leftPlayers.indexOf(pid) !== -1) {
         return; // already gone
     }
     G.leftPlayers = __spreadArrays(G.leftPlayers, [pid]);
-    _log(G, ctx, pid, "left the game");
+    _log(G, ctx, pid, logText);
     // 1. Their cards leave play. Baby unicorns go back to the Nursery, everything
     //    else to the discard pile.
     var dump = function (ids) {
@@ -427,6 +431,15 @@ function playerLeft(G, ctx, leaverID) {
     // 4. Clear UI interaction state that might have pointed at them.
     G.uiCardToCard = undefined;
     G.uiExecuteDo = undefined;
+    // 4b. A kick vote cannot wait on / target a player who is already gone.
+    if (G.kickVote) {
+        if (G.kickVote.targetPlayerID === pid || G.kickVote.initiatedBy === pid) {
+            G.kickVote = undefined;
+        }
+        else if (G.kickVote.votes[pid]) {
+            delete G.kickVote.votes[pid];
+        }
+    }
     // 5. If it was their turn, move on immediately.
     if (ctx.phase !== "pregame" && ctx.currentPlayer === pid) {
         (_a = ctx.events) === null || _a === void 0 ? void 0 : _a.endTurn();
@@ -753,6 +766,85 @@ function giveNeighCards(G, ctx, targetPlayerIds, password) {
                 G.hand[pid] = __spreadArrays(G.hand[pid], given);
             }
         });
+}
+// Everyone eligible to vote in a kick vote: every active player except the
+// target.
+function _kickVoteEligibleVoters(G, targetPlayerID) {
+    return _activePlayers(G).map(function (p) { return p.id; }).filter(function (id) { return id !== targetPlayerID; });
+}
+// Resolves a kick vote the instant the outcome is no longer in doubt.
+function _tryResolveKickVote(G, ctx) {
+    if (!G.kickVote) { return; }
+    var eligible = _kickVoteEligibleVoters(G, G.kickVote.targetPlayerID);
+    var votes = G.kickVote.votes;
+    var yes = eligible.filter(function (id) { return votes[id] === "yes"; }).length;
+    var no = eligible.filter(function (id) { return votes[id] === "no"; }).length;
+    var majority = Math.floor(eligible.length / 2) + 1;
+    if (eligible.length === 0) {
+        G.kickVote = undefined;
+        return;
+    }
+    if (yes >= majority) {
+        var targetID = G.kickVote.targetPlayerID;
+        G.kickVote = undefined;
+        _removePlayerFromGame(G, ctx, targetID, "was voted out of the game");
+        return;
+    }
+    if (no >= majority || (yes + no) >= eligible.length) {
+        G.kickVote = undefined;
+    }
+}
+// Host-only. Puts a kick vote to everyone else.
+function startKickVote(G, ctx, targetPlayerID) {
+    if (String(ctx.playerID) !== "0" || (G.leftPlayers || []).indexOf("0") !== -1) {
+        return core_1.INVALID_MOVE;
+    }
+    if (G.kickVote) {
+        return core_1.INVALID_MOVE;
+    }
+    var pid = String(targetPlayerID);
+    if (pid === "0" || (G.leftPlayers || []).indexOf(pid) !== -1 || G.players.find(function (p) { return p.id === pid; }) === undefined) {
+        return core_1.INVALID_MOVE;
+    }
+    if (_kickVoteEligibleVoters(G, pid).length === 0) {
+        return core_1.INVALID_MOVE;
+    }
+    G.kickVote = {
+        targetPlayerID: pid,
+        initiatedBy: "0",
+        votes: {},
+        startedAt: Date.now(),
+    };
+    var target = G.players.find(function (p) { return p.id === pid; });
+    _log(G, ctx, "0", "started a vote to kick " + ((target && target.name) || ("Player " + pid)));
+}
+// Cast a ballot in the active kick vote.
+function castKickVote(G, ctx, vote) {
+    if (!G.kickVote) {
+        return core_1.INVALID_MOVE;
+    }
+    var voterID = ctx.playerID != null ? String(ctx.playerID) : undefined;
+    if (voterID === undefined || voterID === G.kickVote.targetPlayerID) {
+        return core_1.INVALID_MOVE;
+    }
+    if (vote !== "yes" && vote !== "no") {
+        return core_1.INVALID_MOVE;
+    }
+    if (_kickVoteEligibleVoters(G, G.kickVote.targetPlayerID).indexOf(voterID) === -1) {
+        return core_1.INVALID_MOVE;
+    }
+    G.kickVote.votes[voterID] = vote;
+    _tryResolveKickVote(G, ctx);
+}
+// Host-only. Calls off an in-progress kick vote without removing anyone.
+function cancelKickVote(G, ctx) {
+    if (String(ctx.playerID) !== "0") {
+        return core_1.INVALID_MOVE;
+    }
+    if (!G.kickVote) {
+        return core_1.INVALID_MOVE;
+    }
+    G.kickVote = undefined;
 }
 function canDraw(G, ctx) {
     if (G.mustEndTurnImmediately === true) {

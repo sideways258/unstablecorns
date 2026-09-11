@@ -66,6 +66,16 @@ export interface UnstableUnicornsGame extends Game {
     /** How many Neigh / Super Neigh cards each player has played this game,
      *  shown next to their name in the turn order panel. */
     neighCounts: { [key: string]: number };
+    /** Host-initiated vote to force a player out of the game. Every other
+     *  active player (except the target) gets a yes/no ballot; it resolves
+     *  the moment a majority is reached either way, or once everyone still
+     *  undecided has voted. */
+    kickVote?: {
+        targetPlayerID: PlayerID;
+        initiatedBy: PlayerID;
+        votes: { [key: string]: "yes" | "no" };
+        startedAt: number;
+    };
 }
 
 export interface AuditEntry {
@@ -155,7 +165,7 @@ const UnstableUnicorns = {
     },
     // Available in every phase/stage so the host can always bail out, any player
     // can drop out, and the turn timer / neigh vote timer keep working.
-    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards },
+    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote },
     setup: (ctx: Ctx, setupData: any): UnstableUnicornsGame => {
         const funny = funnyNames(ctx.numPlayers);
         const players: Player[] = Array.from({ length: ctx.numPlayers }, (val, idx) => {
@@ -496,12 +506,19 @@ function playerLeft(G: UnstableUnicornsGame, ctx: Ctx, leaverID?: PlayerID) {
     if (ctx.playerID != null && pid !== String(ctx.playerID)) {
         return INVALID_MOVE;
     }
+    _removePlayerFromGame(G, ctx, pid, "left the game");
+}
+
+// Shared by the self-service "leave" move and a resolved kick vote - both end
+// with the same seat removed the same way, they just differ in who is allowed
+// to trigger it and what gets logged.
+function _removePlayerFromGame(G: UnstableUnicornsGame, ctx: Ctx, pid: PlayerID, logText: string) {
     if (G.leftPlayers.indexOf(pid) !== -1) {
         return; // already gone
     }
 
     G.leftPlayers = [...G.leftPlayers, pid];
-    _log(G, ctx, pid, "left the game");
+    _log(G, ctx, pid, logText);
 
     // 1. Their cards leave play. Baby unicorns go back to the Nursery (their
     //    printed rule), everything else to the discard pile.
@@ -561,6 +578,15 @@ function playerLeft(G: UnstableUnicornsGame, ctx: Ctx, leaverID?: PlayerID) {
     // 4. Clear UI interaction state that might have pointed at them.
     G.uiCardToCard = undefined;
     G.uiExecuteDo = undefined;
+
+    // 4b. A kick vote cannot wait on / target a player who is already gone.
+    if (G.kickVote) {
+        if (G.kickVote.targetPlayerID === pid || G.kickVote.initiatedBy === pid) {
+            G.kickVote = undefined;
+        } else if (G.kickVote.votes[pid]) {
+            delete G.kickVote.votes[pid];
+        }
+    }
 
     // 5. If it was their turn, move on immediately.
     if (ctx.phase !== "pregame" && ctx.currentPlayer === pid) {
@@ -919,6 +945,99 @@ function giveNeighCards(G: UnstableUnicornsGame, ctx: Ctx, targetPlayerIds: Play
                 G.hand[pid] = [...G.hand[pid], ...given];
             }
         });
+}
+
+// Everyone eligible to vote in a kick vote: every active player except the
+// target (they don't get a say in their own removal).
+function _kickVoteEligibleVoters(G: UnstableUnicornsGame, targetPlayerID: PlayerID): PlayerID[] {
+    return _activePlayers(G).map(p => p.id).filter(id => id !== targetPlayerID);
+}
+
+// Resolves a kick vote the instant the outcome is no longer in doubt - a
+// majority of "yes" removes the player immediately, a majority of "no" (or
+// a mathematically unreachable "yes") clears the vote as rejected. Neither
+// side has to wait for stragglers once the result is locked in.
+function _tryResolveKickVote(G: UnstableUnicornsGame, ctx: Ctx) {
+    if (!G.kickVote) { return; }
+    const eligible = _kickVoteEligibleVoters(G, G.kickVote.targetPlayerID);
+    const votes = G.kickVote.votes;
+    const yes = eligible.filter(id => votes[id] === "yes").length;
+    const no = eligible.filter(id => votes[id] === "no").length;
+    const majority = Math.floor(eligible.length / 2) + 1;
+
+    if (eligible.length === 0) {
+        G.kickVote = undefined;
+        return;
+    }
+    if (yes >= majority) {
+        const targetID = G.kickVote.targetPlayerID;
+        G.kickVote = undefined;
+        _removePlayerFromGame(G, ctx, targetID, "was voted out of the game");
+        return;
+    }
+    if (no >= majority || (yes + no) >= eligible.length) {
+        G.kickVote = undefined;
+    }
+}
+
+// Host-only. Puts a kick vote to everyone else: does <targetPlayerID> get
+// forced out of the game? Only one vote can run at a time, and the host
+// can't be voted out (they're the one running the table).
+function startKickVote(G: UnstableUnicornsGame, ctx: Ctx, targetPlayerID: PlayerID) {
+    if (String(ctx.playerID) !== "0" || (G.leftPlayers || []).indexOf("0") !== -1) {
+        return INVALID_MOVE;
+    }
+    if (G.kickVote) {
+        return INVALID_MOVE; // a vote is already in progress
+    }
+    const pid = String(targetPlayerID);
+    if (pid === "0" || (G.leftPlayers || []).indexOf(pid) !== -1 || G.players.find(p => p.id === pid) === undefined) {
+        return INVALID_MOVE;
+    }
+    if (_kickVoteEligibleVoters(G, pid).length === 0) {
+        return INVALID_MOVE; // nobody left to vote
+    }
+
+    G.kickVote = {
+        targetPlayerID: pid,
+        initiatedBy: "0",
+        votes: {},
+        startedAt: Date.now(),
+    };
+    const target = G.players.find(p => p.id === pid);
+    _log(G, ctx, "0", `started a vote to kick ${(target && target.name) || `Player ${pid}`}`);
+}
+
+// Cast a ballot in the active kick vote. Anyone can change their mind up
+// until the vote resolves - the last vote each player casts is the one that
+// counts.
+function castKickVote(G: UnstableUnicornsGame, ctx: Ctx, vote: "yes" | "no") {
+    if (!G.kickVote) {
+        return INVALID_MOVE;
+    }
+    const voterID = ctx.playerID != null ? String(ctx.playerID) : undefined;
+    if (voterID === undefined || voterID === G.kickVote.targetPlayerID) {
+        return INVALID_MOVE;
+    }
+    if (vote !== "yes" && vote !== "no") {
+        return INVALID_MOVE;
+    }
+    if (_kickVoteEligibleVoters(G, G.kickVote.targetPlayerID).indexOf(voterID) === -1) {
+        return INVALID_MOVE;
+    }
+    G.kickVote.votes[voterID] = vote;
+    _tryResolveKickVote(G, ctx);
+}
+
+// Host-only. Calls off an in-progress kick vote without removing anyone.
+function cancelKickVote(G: UnstableUnicornsGame, ctx: Ctx) {
+    if (String(ctx.playerID) !== "0") {
+        return INVALID_MOVE;
+    }
+    if (!G.kickVote) {
+        return INVALID_MOVE;
+    }
+    G.kickVote = undefined;
 }
 
 export function canDraw(G: UnstableUnicornsGame, ctx: Ctx) {

@@ -21,12 +21,28 @@ type Props = {
   /** Host-only, password-gated: deals 2 Super Neigh + 2 Neigh cards to each
    *  chosen player. The move itself re-checks the password too. */
   onGiveNeighCards?: (targetIds: string[], password: string) => void;
+  /** Host-only: puts a vote to everyone else to force `targetId` out of the
+   *  game. Disabled (see `kickVoteActive`) while a vote is already running. */
+  onStartKickVote?: (targetId: string) => void;
+  /** True while a kick vote is already in progress - the on-board vote panel
+   *  is showing, so the host can't start another until it resolves. */
+  kickVoteActive?: boolean;
 };
 
 // Gear button (top-right of the board) that opens an on-screen settings panel.
 // Houses the master volume control, and - for the lobby host only - the
 // "end game for everyone" action.
-const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer, players, onGiveNeighCards }: Props) => {
+const SettingsMenu = ({
+  isHost,
+  onEndGame,
+  onLeave,
+  turnTimer,
+  onSetTurnTimer,
+  players,
+  onGiveNeighCards,
+  onStartKickVote,
+  kickVoteActive,
+}: Props) => {
   const history = useHistory();
   const { volume, muted, tavernMuted, setVolume, toggleMuted, toggleTavernMuted } = useAudioSettings();
   const { themeID, setThemeID } = useBoardTheme();
@@ -69,6 +85,20 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer, p
     onGiveNeighCards!(neighTargets, neighPassword.trim().toLowerCase());
     setNeighSent(true);
     setNeighPassword('');
+  };
+
+  const [showKickTool, setShowKickTool] = useState(false);
+  const [kickTarget, setKickTarget] = useState<string | undefined>(undefined);
+
+  const closeKickTool = () => {
+    setShowKickTool(false);
+    setKickTarget(undefined);
+  };
+
+  const submitKickVote = () => {
+    if (!kickTarget) return;
+    onStartKickVote!(kickTarget);
+    closeKickTool();
   };
 
   return (
@@ -200,44 +230,78 @@ const SettingsMenu = ({ isHost, onEndGame, onLeave, turnTimer, onSetTurnTimer, p
             </>
           )}
 
-          {isHost && players && players.length > 0 && onGiveNeighCards && (
+          {isHost && players && players.length > 0 && (onGiveNeighCards || onStartKickVote) && (
             <>
               <SectionTitle>Host tools</SectionTitle>
-              {!showNeighTool ? (
-                <GhostButton onClick={() => setShowNeighTool(true)}>🎯 Give Neigh cards</GhostButton>
-              ) : (
-                <>
-                  <ConfirmText>
-                    Deals 2 Super Neigh + 2 Neigh cards to whoever you pick. Password required.
-                  </ConfirmText>
-                  <NeighToolInput
-                    type="password"
-                    placeholder="Password"
-                    value={neighPassword}
-                    onChange={(e) => {
-                      setNeighPassword(e.target.value);
-                      setNeighError('');
-                    }}
-                  />
-                  <PlayerList>
-                    {players.map((p) => (
-                      <PlayerCheck key={p.id}>
-                        <input
-                          type="checkbox"
-                          checked={neighTargets.includes(p.id)}
-                          onChange={() => toggleNeighTarget(p.id)}
-                        />
-                        {p.name}
-                      </PlayerCheck>
-                    ))}
-                  </PlayerList>
-                  {neighError && <ErrorText>{neighError}</ErrorText>}
-                  {neighSent && <SuccessText>Dealt.</SuccessText>}
-                  <ConfirmRow>
-                    <GhostButton onClick={closeNeighTool}>Close</GhostButton>
-                    <DangerButton onClick={submitNeighCards}>Give cards</DangerButton>
-                  </ConfirmRow>
-                </>
+              {onStartKickVote && (
+                !showKickTool ? (
+                  <GhostButton onClick={() => setShowKickTool(true)} disabled={kickVoteActive}>
+                    {kickVoteActive ? 'Kick vote in progress…' : '🚫 Start a kick vote'}
+                  </GhostButton>
+                ) : (
+                  <>
+                    <ConfirmText>
+                      Puts it to a vote: everyone but the target decides whether they're forced out of the game.
+                    </ConfirmText>
+                    <PlayerList>
+                      {players.filter((p) => p.id !== '0').map((p) => (
+                        <PlayerCheck key={p.id}>
+                          <input
+                            type="radio"
+                            name="kick-target"
+                            checked={kickTarget === p.id}
+                            onChange={() => setKickTarget(p.id)}
+                          />
+                          {p.name}
+                        </PlayerCheck>
+                      ))}
+                    </PlayerList>
+                    <ConfirmRow>
+                      <GhostButton onClick={closeKickTool}>Close</GhostButton>
+                      <DangerButton onClick={submitKickVote} disabled={!kickTarget}>
+                        Start vote
+                      </DangerButton>
+                    </ConfirmRow>
+                  </>
+                )
+              )}
+              {onGiveNeighCards && (
+                !showNeighTool ? (
+                  <GhostButton onClick={() => setShowNeighTool(true)}>🎯 Give Neigh cards</GhostButton>
+                ) : (
+                  <>
+                    <ConfirmText>
+                      Deals 2 Super Neigh + 2 Neigh cards to whoever you pick. Password required.
+                    </ConfirmText>
+                    <NeighToolInput
+                      type="password"
+                      placeholder="Password"
+                      value={neighPassword}
+                      onChange={(e) => {
+                        setNeighPassword(e.target.value);
+                        setNeighError('');
+                      }}
+                    />
+                    <PlayerList>
+                      {players.map((p) => (
+                        <PlayerCheck key={p.id}>
+                          <input
+                            type="checkbox"
+                            checked={neighTargets.includes(p.id)}
+                            onChange={() => toggleNeighTarget(p.id)}
+                          />
+                          {p.name}
+                        </PlayerCheck>
+                      ))}
+                    </PlayerList>
+                    {neighError && <ErrorText>{neighError}</ErrorText>}
+                    {neighSent && <SuccessText>Dealt.</SuccessText>}
+                    <ConfirmRow>
+                      <GhostButton onClick={closeNeighTool}>Close</GhostButton>
+                      <DangerButton onClick={submitNeighCards}>Give cards</DangerButton>
+                    </ConfirmRow>
+                  </>
+                )
               )}
             </>
           )}
@@ -400,6 +464,10 @@ const baseBtn = `
   font-size: 11pt;
   cursor: pointer;
   border: 2px solid #fff;
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const DangerButton = styled.button`

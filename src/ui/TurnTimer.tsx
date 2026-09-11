@@ -25,12 +25,27 @@ const TurnTimer = (props: any) => {
   const visible = !!tt && !!ctx && ctx.phase === 'main' && !ctx.gameover;
   const enabled = visible && tt.enabled === true && !!tt.turnStartedAt;
 
+  // tt.turnStartedAt is stamped with the SERVER's clock. Comparing it directly
+  // against this browser's own Date.now() makes the displayed countdown start
+  // at whatever the client/server clock difference happens to be, instead of
+  // the real duration - that's the "starts at a random amount" bug. Fix: only
+  // use turnStartedAt as a "did a fresh countdown just begin?" signal, and
+  // anchor the actual countdown to the moment THIS client first observed it,
+  // so it always starts at exactly the configured duration.
+  const localStartRef = useRef<{ key: number; at: number } | null>(null);
+  if (enabled && (!localStartRef.current || localStartRef.current.key !== tt.turnStartedAt)) {
+    localStartRef.current = { key: tt.turnStartedAt, at: Date.now() };
+  } else if (!enabled) {
+    localStartRef.current = null;
+  }
+  const localStart = localStartRef.current ? localStartRef.current.at : undefined;
+
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || localStart === undefined) return;
     const tickOnce = () => {
       setNow(Date.now());
       if (muted || masterVolume <= 0) return;
-      const remainingMs = tt.turnStartedAt + tt.durationSec * 1000 - Date.now();
+      const remainingMs = localStart + tt.durationSec * 1000 - Date.now();
       const secsLeft = Math.ceil(remainingMs / 1000);
       if (secsLeft <= 0) return;
       const ramp = Math.max(0, Math.min(1, (RAMP_SECS - secsLeft) / (RAMP_SECS - 1)));
@@ -39,11 +54,11 @@ const TurnTimer = (props: any) => {
     };
     const id = setInterval(tickOnce, 1000);
     return () => clearInterval(id);
-  }, [enabled, tt, masterVolume, muted]);
+  }, [enabled, localStart, tt?.durationSec, masterVolume, muted]);
 
   useEffect(() => {
-    if (!enabled) return;
-    const remaining = tt.turnStartedAt + tt.durationSec * 1000 - now;
+    if (!enabled || localStart === undefined) return;
+    const remaining = localStart + tt.durationSec * 1000 - now;
     // Retry every few seconds until the turn actually flips (which moves
     // turnStartedAt forward and makes `remaining` positive again). The server
     // move is guarded, so an early / duplicate nudge is a harmless no-op.
@@ -57,7 +72,7 @@ const TurnTimer = (props: any) => {
         /* another client got there first */
       }
     }
-  }, [enabled, now, tt, props.moves]);
+  }, [enabled, now, localStart, tt?.durationSec, props.moves]);
 
   if (!visible) return null;
 
@@ -66,7 +81,7 @@ const TurnTimer = (props: any) => {
     props.moves.setTurnTimer({ enabled: !enabled });
   };
 
-  if (!enabled) {
+  if (!enabled || localStart === undefined) {
     return (
       <ClockButton
         type="button"
@@ -82,7 +97,7 @@ const TurnTimer = (props: any) => {
     );
   }
 
-  const remaining = Math.max(0, tt.turnStartedAt + tt.durationSec * 1000 - now);
+  const remaining = Math.max(0, localStart + tt.durationSec * 1000 - now);
   const secs = Math.ceil(remaining / 1000);
   const mm = Math.floor(secs / 60);
   const ss = secs % 60;
