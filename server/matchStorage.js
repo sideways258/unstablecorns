@@ -29,21 +29,71 @@ var CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 // silently deleting an active game. This wraps setState (which boardgame.io
 // calls on every move) so metadata.updatedAt actually reflects the last time
 // someone did something, which is what the cleanup sweep needs it to mean.
+//
+// Captures raw, unwrapped references to fetch/setMetadata at wrap time (not a
+// live `db.fetch` lookup) specifically so this keeps working correctly once
+// wrapDbWithMatchLock (below) is layered on top - those calls must bypass the
+// per-match queue, not re-enter it (see that function's comment for why).
 function wrapDbWithActivityTracking(db) {
     var originalSetState = db.setState.bind(db);
+    var rawFetch = db.fetch.bind(db);
+    var rawSetMetadata = db.setMetadata.bind(db);
     db.setState = async function (matchID, state, deltalog) {
         var result = await originalSetState(matchID, state, deltalog);
         try {
-            var existing = await db.fetch(matchID, { metadata: true });
+            var existing = await rawFetch(matchID, { metadata: true });
             if (existing && existing.metadata) {
                 existing.metadata.updatedAt = Date.now();
-                await db.setMetadata(matchID, existing.metadata);
+                await rawSetMetadata(matchID, existing.metadata);
             }
         } catch (e) {
             console.warn("Match storage: failed to bump activity timestamp for " + matchID + ":", e && e.message);
         }
         return result;
     };
+    return db;
+}
+
+// boardgame.io processes a move as fetch(state) -> apply the move -> setState
+// (new state). With the default in-memory store that whole cycle is
+// synchronous, so two players reacting to the same thing (e.g. both racing to
+// respond to a neigh discussion) can never interleave. FlatFile's fetch/write
+// are real, async file I/O though, which opens a genuine window: player B's
+// fetch can land before player A's write finishes, so B computes their move
+// against stale state and silently clobbers A's write when it lands (seen in
+// practice as two Super Neighs landing back-to-back on the same discussion,
+// even though the move logic unconditionally ends it after the first one).
+//
+// This serializes every fetch/setState/setMetadata/wipe/createMatch call for
+// a given matchID into one FIFO queue, so a match's read-modify-write cycles
+// can never interleave with each other regardless of I/O timing. It must be
+// the OUTERMOST wrapper (applied after wrapDbWithActivityTracking) - that
+// wrapper's own internal fetch/setMetadata calls use raw, pre-wrap references
+// specifically so they don't re-enter this queue from inside an already
+// in-flight job for the same matchID, which would deadlock it forever.
+function wrapDbWithMatchLock(db) {
+    var queueTails = {}; // matchID -> tail of that match's pending job chain
+
+    function serialize(matchID, fn) {
+        var tail = queueTails[matchID] || Promise.resolve();
+        var run = tail.then(fn, fn);
+        // keep the chain moving even if a job throws/rejects - don't let one
+        // failed move permanently wedge every later move for that match.
+        queueTails[matchID] = run.then(function () {}, function () {});
+        return run;
+    }
+
+    ["fetch", "setState", "setMetadata", "wipe", "createMatch"].forEach(function (method) {
+        if (typeof db[method] !== "function") { return; }
+        var original = db[method].bind(db);
+        db[method] = function (matchID) {
+            var args = arguments;
+            return serialize(matchID, function () {
+                return original.apply(null, args);
+            });
+        };
+    });
+
     return db;
 }
 
@@ -77,7 +127,9 @@ function createDb() {
         // sweep below (cleanupOldMatches) is what actually reclaims disk
         // space for matches nobody ever touches again. Belt and suspenders.
         var db = new FlatFile({ dir: MATCHES_DIR, logging: false, ttl: MATCH_MAX_AGE_MS });
-        return wrapDbWithActivityTracking(db);
+        db = wrapDbWithActivityTracking(db);
+        db = wrapDbWithMatchLock(db);
+        return db;
     } catch (e) {
         console.warn("Match storage: failed to initialize FlatFile, falling back to in-memory:", e && e.message);
         return undefined;

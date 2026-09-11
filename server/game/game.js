@@ -615,15 +615,16 @@ function playUpgradeDowngradeCard(G, ctx, protagonist, targetPlayer, cardID) {
 }
 function playNeigh(G, ctx, cardID, protagonist, roundIndex) {
     if (G.neighDiscussion) {
+        var round = G.neighDiscussion.rounds[roundIndex];
+        // Check whether this round was already decided BEFORE touching the
+        // player's hand/discard pile - a stale/late call must be a true
+        // no-op, not consume their card for nothing.
+        if (!round || round.state !== "open") {
+            return;
+        }
         G.hand[protagonist] = underscore_1["default"].without(G.hand[protagonist], cardID);
         G.discardPile = __spreadArrays(G.discardPile, [cardID]);
         _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID), cardID);
-        var round = G.neighDiscussion.rounds[roundIndex];
-        // check if there was already a neigh vote during this round
-        // if yes do nothing
-        if (round.state !== "open") {
-            return;
-        }
         // there was no neigh round yet
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
@@ -641,15 +642,16 @@ function playNeigh(G, ctx, cardID, protagonist, roundIndex) {
 }
 function playSuperNeigh(G, ctx, cardID, protagonist, roundIndex) {
     if (G.neighDiscussion) {
+        var round = G.neighDiscussion.rounds[roundIndex];
+        // A Super Neigh can never land on an already-decided round - not
+        // even another Super Neigh. Checked BEFORE touching hand/discard so
+        // a stale/late call is a true no-op, not a wasted card.
+        if (!round || round.state !== "open") {
+            return;
+        }
         G.hand[protagonist] = underscore_1["default"].without(G.hand[protagonist], cardID);
         G.discardPile = __spreadArrays(G.discardPile, [cardID]);
         _log(G, ctx, protagonist, "played " + _cardTitle(G, cardID), cardID);
-        var round = G.neighDiscussion.rounds[roundIndex];
-        // check if there was already a neigh vote during this round
-        // if yes do nothing
-        if (round.state !== "open") {
-            return;
-        }
         // there was no neigh round yet
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
@@ -672,6 +674,11 @@ function dontPlayNeigh(G, ctx, protagonist, roundIndex) {
     // end
     if (G.neighDiscussion) {
         var round = G.neighDiscussion.rounds[roundIndex];
+        // Same guard as playNeigh/playSuperNeigh: a stale call for an
+        // already-decided round must be a no-op, not re-resolve it.
+        if (!round || round.state !== "open") {
+            return;
+        }
         round.playerState[protagonist] = { vote: "no_neigh" };
         if (underscore_1["default"].findKey(round.playerState, function (val) { return val.vote === "undecided"; }) === undefined) {
             // everyone has voted => advance the game

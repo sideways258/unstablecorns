@@ -786,16 +786,19 @@ function playUpgradeDowngradeCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist
 
 function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonist: PlayerID, roundIndex: number) {
     if (G.neighDiscussion) {
+        const round = G.neighDiscussion.rounds[roundIndex];
+        // Check whether this round was already decided (e.g. someone else's
+        // Super Neigh just closed the whole discussion) BEFORE touching the
+        // player's hand/discard pile - a stale/late call must be a true
+        // no-op, not consume their card for nothing.
+        if (!round || round.state !== "open") {
+            return;
+        }
+
         G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
         G.discardPile = [...G.discardPile, cardID];
         _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
 
-        const round = G.neighDiscussion.rounds[roundIndex];
-        // check if there was already a neigh vote during this round
-        // if yes do nothing
-        if (round.state !== "open") {
-            return;
-        }
         // there was no neigh round yet
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
@@ -814,16 +817,19 @@ function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonis
 
 function playSuperNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonist: PlayerID, roundIndex: number) {
     if (G.neighDiscussion) {
+        const round = G.neighDiscussion.rounds[roundIndex];
+        // A Super Neigh can never land on an already-decided round - not even
+        // another Super Neigh (its whole point is that it can't be
+        // countered). Checked BEFORE touching hand/discard so a stale/late
+        // call is a true no-op, not a wasted card.
+        if (!round || round.state !== "open") {
+            return;
+        }
+
         G.hand[protagonist] = _.without(G.hand[protagonist], cardID);
         G.discardPile = [...G.discardPile, cardID];
         _log(G, ctx, protagonist, `played ${_cardTitle(G, cardID)}`, cardID);
 
-        const round = G.neighDiscussion.rounds[roundIndex];
-        // check if there was already a neigh vote during this round
-        // if yes do nothing
-        if (round.state !== "open") {
-            return;
-        }
         // there was no neigh round yet
         // hence neigh the round and add a next round
         round.playerState[protagonist] = { vote: "neigh" };
@@ -847,6 +853,13 @@ function dontPlayNeigh(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID,
     // end
     if (G.neighDiscussion) {
         const round = G.neighDiscussion.rounds[roundIndex];
+        // Same guard as playNeigh/playSuperNeigh: a stale call for a round
+        // that's already been decided (e.g. someone's Super Neigh already
+        // closed the whole discussion) must be a no-op, not re-resolve or
+        // overwrite an already-final round.
+        if (!round || round.state !== "open") {
+            return;
+        }
         round.playerState[protagonist] = { vote: "no_neigh" };
 
         if (_.findKey(round.playerState, val => val.vote === "undecided") === undefined) {
