@@ -42,7 +42,16 @@ var serve = require('koa-static');
 var Server = require('boardgame.io/server').Server;
 var games_1 = require("./games");
 var admin_1 = require("./admin");
-var server = Server({ games: games_1.games });
+var matchStorage_1 = require("./matchStorage");
+// Persist match state to DATA_DIR so games survive a container restart (a
+// deploy, a crash, a reboot) instead of vanishing with the old process's
+// memory. Falls back to boardgame.io's default in-memory storage (today's
+// behavior) if the persistent store can't be set up for any reason.
+var db = matchStorage_1.createDb();
+var server = Server({ games: games_1.games, db: db });
+// Sweep out matches nobody has touched in 30+ days so /data doesn't grow
+// without bound.
+matchStorage_1.startCleanupSchedule(db);
 // Admin panel API + uploaded card art. Mounted BEFORE the static handler so
 // /api/* and /uploads/* are answered here and never fall through to the SPA.
 admin_1.mount(server.app);
