@@ -347,15 +347,21 @@ const UnstableUnicorns = {
             }
         },
         stages: {
+            // NOTE: boardgame.io does NOT fall back to the game-level `moves` for a
+            // player currently inside a stage - every move a player might need while
+            // staged (which, via setActivePlayers({all: ...}) below, is always) has
+            // to be listed again here. Missing one here means the move silently gets
+            // rejected client-side before the move function ever runs, even though
+            // it's right there in the top-level `moves` object above.
             pregame: {
-                moves: { ready, unready, selectBaby, changeName, endMatch, setExpansions, playerLeft, setTurnTimer, forceEndTurnOnTimeout }
+                moves: { ready, unready, selectBaby, changeName, endMatch, setExpansions, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startKickVote, castKickVote, cancelKickVote }
             },
             beginning: {
-                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout }
+                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote }
             },
             action_phase: {
                 moves: {
-                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout
+                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote
                 }
             }
         }

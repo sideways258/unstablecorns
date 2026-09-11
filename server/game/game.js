@@ -227,15 +227,18 @@ var UnstableUnicorns = {
             }
         },
         stages: {
+            // boardgame.io does NOT fall back to the game-level moves for a player
+            // currently inside a stage - every move needed while staged (always,
+            // via setActivePlayers({all: ...})) has to be repeated here too.
             pregame: {
-                moves: { ready: ready, unready: unready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout }
+                moves: { ready: ready, unready: unready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote }
             },
             beginning: {
-                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout }
+                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote }
             },
             action_phase: {
                 moves: {
-                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout
+                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote
                 }
             }
         }
