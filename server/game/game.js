@@ -346,6 +346,7 @@ function _countUnicorns(G, playerID) {
         return sum + (countsAsTwo ? 2 : 1);
     }, 0);
 }
+exports._countUnicorns = _countUnicorns;
 // Only the lobby host (seat 0) may end the match for everyone. endIf picks this up.
 function endMatch(G, ctx) {
     if (ctx.playerID !== "0") {

@@ -1,5 +1,5 @@
 import { Card, CardID, isUnicorn, OnEnter, OnEnterAddEffect, OnEnterAddScene } from "./card";
-import { UnstableUnicornsGame, Ctx, Scene, Instruction, Action, _addSceneFromDo, _recordCardTarget } from "./game";
+import { UnstableUnicornsGame, Ctx, Scene, Instruction, Action, _addSceneFromDo, _recordCardTarget, _countUnicorns } from "./game";
 import type { PlayerID } from "./player";
 import _ from 'underscore';
 import { CONSTANTS } from "./constants";
@@ -248,8 +248,11 @@ export function canEnter(G: UnstableUnicornsGame, ctx: Ctx, param: ParamEnter) {
 
     // Upgrade / Downgrade cards go into their own stable row - a full Unicorn
     // stable never blocks them (e.g. stealing an Upgrade with Alluring Narwhal).
+    // Use the same pandamonium-aware count the win condition uses: with
+    // Pandamonium active every Unicorn in the stable is a Panda and doesn't
+    // count, so a "full" stable of Pandas must not block new cards either.
     if (card.type !== "upgrade" && card.type !== "downgrade"
-        && G.stable[param.playerID].length === CONSTANTS.stableSeats) {
+        && _countUnicorns(G, param.playerID) >= CONSTANTS.stableSeats) {
         return false;
     }
 
