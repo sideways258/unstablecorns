@@ -127,11 +127,27 @@ function wrapDbNeverThrowOnWrite(db) {
     return db;
 }
 
+// TEMPORARILY DISABLED: the installed node-persist version doesn't provide
+// the .keys() method boardgame.io's FlatFile calls internally ("this.games.keys
+// is not a function" in the logs), and the same broken instance backs every
+// match read/write - not just cleanup. In production this manifested as a
+// brand new match hanging on "connecting..." forever (its initial state
+// fetch never resolved). Falling back to in-memory (today's original
+// behavior, matches don't survive a restart) until the node-persist/FlatFile
+// version mismatch is actually root-caused - a live game hanging is worse
+// than losing persistence across restarts. Flip this back to `false` once
+// that's fixed and verified.
+var PERSISTENCE_DISABLED = true;
+
 // Builds the persistent match store. Returns undefined (falling back to
 // boardgame.io's default in-memory storage) if FlatFile isn't available for
 // any reason - a missing/broken store should never stop the server from
 // starting, it should just mean state doesn't survive a restart.
 function createDb() {
+    if (PERSISTENCE_DISABLED) {
+        console.warn("Match storage: persistence is temporarily disabled (node-persist/FlatFile incompatibility) - match state will not survive a restart.");
+        return undefined;
+    }
     try {
         fs.mkdirSync(MATCHES_DIR, { recursive: true });
     } catch (e) {
