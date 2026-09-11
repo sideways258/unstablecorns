@@ -321,6 +321,16 @@ const Board = (props: any) => {
         setC2CArrow(undefined);
         setHoverTargets(undefined);
         setShowStableOf(undefined);
+        // Also close any Finder popup a "you may..." choice opened (e.g. Swift
+        // Flying Unicorn's "Add Neigh card" opens the discard pile) - none of
+        // these are tied to cardInteraction, so without this the popup just
+        // sits there after Cancel resets the underlying instruction server-side.
+        // Most visible when the pile has zero matching cards (setShowDiscardFinder([])
+        // is still truthy), since then there's nothing to click to close it either.
+        setShowDeckFinder(undefined);
+        setShowDiscardFinder(undefined);
+        setSHowNurseryFinder(false);
+        setShowBlatantThievery(undefined);
         moves.setUICardToCard(undefined);
         cancellableStates.forEach((b: BoardState) => moves.skipExecuteDo(playerID, (b as any).info.instructionID));
     };
