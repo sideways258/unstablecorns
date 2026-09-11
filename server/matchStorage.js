@@ -4,14 +4,16 @@
 // every game in progress. Without this, boardgame.io keeps match state only
 // in the Node process's memory, and a new container starts from nothing.
 //
-// Storage itself is boardgame.io's own FlatFile adapter (one JSON file per
-// match under DATA_DIR/matches), so no extra database is needed and it lives
-// on the same volume already used for admin.json / custom expansions.
+// Storage is our own FileStore (see fileStore.js) - one JSON file per match
+// under DATA_DIR/matches, no extra database and no third-party storage
+// dependency. This replaced boardgame.io's own FlatFile+node-persist adapter,
+// which was broken in production (see fileStore.js's header comment for why).
 exports.__esModule = true;
 
 var fs = require("fs");
 var path = require("path");
 var ce = require("./customExpansions");
+var FileStore = require("./fileStore").FileStore;
 
 var MATCHES_DIR = path.join(ce.DATA_DIR, "matches");
 
@@ -57,8 +59,8 @@ function wrapDbWithActivityTracking(db) {
 // boardgame.io processes a move as fetch(state) -> apply the move -> setState
 // (new state). With the default in-memory store that whole cycle is
 // synchronous, so two players reacting to the same thing (e.g. both racing to
-// respond to a neigh discussion) can never interleave. FlatFile's fetch/write
-// are real, async file I/O though, which opens a genuine window: player B's
+// respond to a neigh discussion) can never interleave. Our file store's
+// fetch/write are real, async file I/O though, which opens a genuine window: player B's
 // fetch can land before player A's write finishes, so B computes their move
 // against stale state and silently clobbers A's write when it lands (seen in
 // practice as two Super Neighs landing back-to-back on the same discussion,
@@ -98,7 +100,7 @@ function wrapDbWithMatchLock(db) {
 }
 
 // A disk/file-I/O hiccup on a write (a full disk, a permissions issue, a
-// transient node-persist error) must never be allowed to reach boardgame.io
+// transient fs error) must never be allowed to reach boardgame.io
 // as a rejected promise - depending on the version, an uncaught rejection
 // inside its move-processing can crash the entire Node process (Node's
 // default since v15 is to terminate on unhandled rejection), taking down
@@ -127,27 +129,11 @@ function wrapDbNeverThrowOnWrite(db) {
     return db;
 }
 
-// TEMPORARILY DISABLED: the installed node-persist version doesn't provide
-// the .keys() method boardgame.io's FlatFile calls internally ("this.games.keys
-// is not a function" in the logs), and the same broken instance backs every
-// match read/write - not just cleanup. In production this manifested as a
-// brand new match hanging on "connecting..." forever (its initial state
-// fetch never resolved). Falling back to in-memory (today's original
-// behavior, matches don't survive a restart) until the node-persist/FlatFile
-// version mismatch is actually root-caused - a live game hanging is worse
-// than losing persistence across restarts. Flip this back to `false` once
-// that's fixed and verified.
-var PERSISTENCE_DISABLED = true;
-
 // Builds the persistent match store. Returns undefined (falling back to
-// boardgame.io's default in-memory storage) if FlatFile isn't available for
+// boardgame.io's default in-memory storage) if the store can't be set up for
 // any reason - a missing/broken store should never stop the server from
 // starting, it should just mean state doesn't survive a restart.
 function createDb() {
-    if (PERSISTENCE_DISABLED) {
-        console.warn("Match storage: persistence is temporarily disabled (node-persist/FlatFile incompatibility) - match state will not survive a restart.");
-        return undefined;
-    }
     try {
         fs.mkdirSync(MATCHES_DIR, { recursive: true });
     } catch (e) {
@@ -155,30 +141,14 @@ function createDb() {
         return undefined;
     }
 
-    var FlatFile;
     try {
-        FlatFile = require("boardgame.io/server").FlatFile;
-    } catch (e) {
-        FlatFile = undefined;
-    }
-    if (typeof FlatFile !== "function") {
-        console.warn("Match storage: boardgame.io FlatFile isn't available - match state will not survive a restart.");
-        return undefined;
-    }
-
-    try {
-        // `ttl` makes node-persist stop returning an expired key's data as
-        // soon as anyone tries to read it, but it does NOT delete the file on
-        // its own (node-persist expires lazily, on access) - the periodic
-        // sweep below (cleanupOldMatches) is what actually reclaims disk
-        // space for matches nobody ever touches again. Belt and suspenders.
-        var db = new FlatFile({ dir: MATCHES_DIR, logging: false, ttl: MATCH_MAX_AGE_MS });
+        var db = new FileStore({ dir: MATCHES_DIR });
         db = wrapDbWithActivityTracking(db);
         db = wrapDbWithMatchLock(db);
         db = wrapDbNeverThrowOnWrite(db);
         return db;
     } catch (e) {
-        console.warn("Match storage: failed to initialize FlatFile, falling back to in-memory:", e && e.message);
+        console.warn("Match storage: failed to initialize the file store, falling back to in-memory:", e && e.message);
         return undefined;
     }
 }
