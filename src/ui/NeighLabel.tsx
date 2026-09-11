@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 import ImageLoader from '../assets/card/imageLoader';
@@ -29,6 +29,13 @@ type Props = {
     onDontPlayNeighClick: () => void;
     /** Names of players who still haven't clicked "Neigh" or "Don't neigh" this round. */
     pendingPlayerNames?: string[];
+    /** Only the host (seat 0) can arm the auto "don't neigh" countdown. */
+    isHost?: boolean;
+    voteTimeoutStartedAt?: number;
+    voteTimeoutDurationSec?: number;
+    onStartVoteTimer?: () => void;
+    /** Called (repeatedly, harmlessly) once the countdown has actually run out. */
+    onForceVoteTimeout?: () => void;
 }
 
 export type NeighLabelRole = "original_initiator" | "new_initiator" | "did_neigh" | "did_not_neigh" | "open" | "original_initiator_can_counterneigh";
@@ -42,6 +49,29 @@ const NeighLabel = (props: Props) => {
         volume: 0.3,
     });
     const context = useContext(LanguageContext)
+
+    // Countdown display + (throttled) auto-timeout dispatch once it hits zero.
+    const [now, setNow] = useState(() => Date.now());
+    const lastForceFire = useRef(0);
+    const { voteTimeoutStartedAt, voteTimeoutDurationSec, onForceVoteTimeout } = props;
+    useEffect(() => {
+        if (!voteTimeoutStartedAt || !voteTimeoutDurationSec) return;
+        const tick = () => {
+            const n = Date.now();
+            setNow(n);
+            const remainingMs = voteTimeoutStartedAt + voteTimeoutDurationSec * 1000 - n;
+            if (remainingMs <= 0 && onForceVoteTimeout && n - lastForceFire.current > 3000) {
+                lastForceFire.current = n;
+                try { onForceVoteTimeout(); } catch (e) { /* another client already resolved it */ }
+            }
+        };
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [voteTimeoutStartedAt, voteTimeoutDurationSec, onForceVoteTimeout]);
+    const voteTimeoutSecsLeft = voteTimeoutStartedAt && voteTimeoutDurationSec
+        ? Math.max(0, Math.ceil((voteTimeoutStartedAt + voteTimeoutDurationSec * 1000 - now) / 1000))
+        : undefined;
 
     const onText = props.targetName && props.targetName !== props.originalInitiatorName ? ` on ${props.targetName}` : "";
     const names = props.playerNames && props.playerNames.length > 0
@@ -141,6 +171,21 @@ const NeighLabel = (props: Props) => {
                                 <PendingChip key={name}>{name}</PendingChip>
                             ))}
                         </PendingChips>
+                        {voteTimeoutSecsLeft !== undefined ? (
+                            <TimerBadge>
+                                ⏱ auto-skipping in {voteTimeoutSecsLeft}s
+                            </TimerBadge>
+                        ) : props.isHost && props.onStartVoteTimer ? (
+                            <TimerButton
+                                onClick={() => {
+                                    props.onStartVoteTimer!();
+                                    playMouseClick();
+                                }}
+                                title="Auto-select &ldquo;don't neigh&rdquo; for anyone who hasn't voted after the countdown"
+                            >
+                                ⏱ Start timer
+                            </TimerButton>
+                        ) : null}
                     </Pending>
                 )}
             </Wrapper>
@@ -275,6 +320,34 @@ const PendingChip = styled.span`
     font-weight: 700;
     color: #241d14;
     background: linear-gradient(135deg, #ffd76a, #f8b500);
+`;
+
+const TimerBadge = styled.span`
+    margin-left: auto;
+    padding: 0.3em 0.8em;
+    border-radius: 999px;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(255, 107, 107, 0.25);
+    border: 1.5px solid #ff6b6b;
+    white-space: nowrap;
+`;
+
+const TimerButton = styled.button`
+    margin-left: auto;
+    padding: 0.35em 0.9em;
+    border-radius: 999px;
+    font-family: 'Fredoka', 'Open Sans', sans-serif;
+    font-weight: 700;
+    font-size: 10pt;
+    color: #fff;
+    cursor: pointer;
+    border: 2px solid #fff;
+    background: linear-gradient(135deg, #7c9cff, #3d5edb);
+    white-space: nowrap;
+    &:hover { filter: brightness(1.1); }
+    &:active { transform: translateY(1px); }
 `;
 
 export default NeighLabel;

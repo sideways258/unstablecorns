@@ -52,7 +52,7 @@ var UnstableUnicorns = {
     },
     // Available in every phase/stage so the host can always bail out, any player
     // can drop out, and the turn timer keeps working.
-    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout },
+    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout },
     setup: function (ctx, setupData) {
         var funny = funnyNames_1.funnyNames(ctx.numPlayers);
         var players = Array.from({ length: ctx.numPlayers }, function (val, idx) {
@@ -616,6 +616,9 @@ function playNeigh(G, ctx, cardID, protagonist, roundIndex) {
             state: "open",
             playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
         });
+        // the set of undecided voters just changed - the host must re-arm the timer
+        G.neighDiscussion.voteTimeoutStartedAt = undefined;
+        G.neighDiscussion.voteTimeoutDurationSec = undefined;
     }
 }
 function playSuperNeigh(G, ctx, cardID, protagonist, roundIndex) {
@@ -666,6 +669,42 @@ function dontPlayNeigh(G, ctx, protagonist, roundIndex) {
             G.neighDiscussion = undefined;
         }
     }
+}
+var NEIGH_VOTE_TIMER_SEC = 15;
+// Host-only. Arms a countdown for the current neigh round; once it expires,
+// forceNeighVoteTimeout() auto-picks "don't neigh" for anyone still undecided.
+function startNeighVoteTimer(G, ctx, protagonist) {
+    if (String(ctx.playerID) !== "0") {
+        return core_1.INVALID_MOVE;
+    }
+    if (!G.neighDiscussion) {
+        return core_1.INVALID_MOVE;
+    }
+    G.neighDiscussion.voteTimeoutStartedAt = Date.now();
+    G.neighDiscussion.voteTimeoutDurationSec = NEIGH_VOTE_TIMER_SEC;
+}
+// Any player may call this once the host's neigh timer has actually expired -
+// guarded, so it's a no-op unless there's really a pending, timed-out round.
+// Reuses dontPlayNeigh() for every still-undecided player so the normal
+// round-resolution logic (advance / resolve the card) runs exactly once.
+function forceNeighVoteTimeout(G, ctx) {
+    if (!G.neighDiscussion) {
+        return core_1.INVALID_MOVE;
+    }
+    var voteTimeoutStartedAt = G.neighDiscussion.voteTimeoutStartedAt;
+    var voteTimeoutDurationSec = G.neighDiscussion.voteTimeoutDurationSec;
+    if (!voteTimeoutStartedAt || !voteTimeoutDurationSec) {
+        return core_1.INVALID_MOVE;
+    }
+    if (Date.now() - voteTimeoutStartedAt < voteTimeoutDurationSec * 1000) {
+        return core_1.INVALID_MOVE;
+    }
+    var roundIndex = G.neighDiscussion.rounds.length - 1;
+    var round = G.neighDiscussion.rounds[roundIndex];
+    var undecided = Object.keys(round.playerState).filter(function (pid) { return round.playerState[pid].vote === "undecided"; });
+    undecided.forEach(function (pid) {
+        dontPlayNeigh(G, ctx, pid, roundIndex);
+    });
 }
 function canDraw(G, ctx) {
     if (G.mustEndTurnImmediately === true) {

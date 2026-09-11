@@ -154,8 +154,8 @@ const UnstableUnicorns = {
         }
     },
     // Available in every phase/stage so the host can always bail out, any player
-    // can drop out, and the turn timer keeps working.
-    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout },
+    // can drop out, and the turn timer / neigh vote timer keep working.
+    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout },
     setup: (ctx: Ctx, setupData: any): UnstableUnicornsGame => {
         const funny = funnyNames(ctx.numPlayers);
         const players: Player[] = Array.from({ length: ctx.numPlayers }, (val, idx) => {
@@ -773,6 +773,9 @@ function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonis
             state: "open",
             playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
         });
+        // the set of undecided voters just changed - the host must re-arm the timer
+        G.neighDiscussion.voteTimeoutStartedAt = undefined;
+        G.neighDiscussion.voteTimeoutDurationSec = undefined;
     }
 }
 
@@ -826,6 +829,45 @@ function dontPlayNeigh(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID,
             G.neighDiscussion = undefined;
         }
     }
+}
+
+const NEIGH_VOTE_TIMER_SEC = 15;
+
+// Host-only. Arms a countdown for the current neigh round; once it expires,
+// forceNeighVoteTimeout() auto-picks "don't neigh" for anyone still undecided.
+function startNeighVoteTimer(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID) {
+    if (String(ctx.playerID) !== "0") {
+        return INVALID_MOVE;
+    }
+    if (!G.neighDiscussion) {
+        return INVALID_MOVE;
+    }
+    G.neighDiscussion.voteTimeoutStartedAt = Date.now();
+    G.neighDiscussion.voteTimeoutDurationSec = NEIGH_VOTE_TIMER_SEC;
+}
+
+// Any player may call this once the host's neigh timer has actually expired -
+// guarded, so it's a no-op unless there's really a pending, timed-out round.
+// Reuses dontPlayNeigh() for every still-undecided player so the normal
+// round-resolution logic (advance / resolve the card) runs exactly once.
+function forceNeighVoteTimeout(G: UnstableUnicornsGame, ctx: Ctx) {
+    if (!G.neighDiscussion) {
+        return INVALID_MOVE;
+    }
+    const { voteTimeoutStartedAt, voteTimeoutDurationSec } = G.neighDiscussion;
+    if (!voteTimeoutStartedAt || !voteTimeoutDurationSec) {
+        return INVALID_MOVE;
+    }
+    if (Date.now() - voteTimeoutStartedAt < voteTimeoutDurationSec * 1000) {
+        return INVALID_MOVE;
+    }
+
+    const roundIndex = G.neighDiscussion.rounds.length - 1;
+    const round = G.neighDiscussion.rounds[roundIndex];
+    const undecided = Object.keys(round.playerState).filter(pid => round.playerState[pid].vote === "undecided");
+    undecided.forEach(pid => {
+        dontPlayNeigh(G, ctx, pid, roundIndex);
+    });
 }
 
 export function canDraw(G: UnstableUnicornsGame, ctx: Ctx) {

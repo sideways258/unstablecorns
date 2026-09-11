@@ -1005,7 +1005,25 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
 
     return (
         <NeighLabelWrapper>
-            <NeighLabel card={G.deck[G.neighDiscussion.cardID]} originalInitiatorName={originalInitiatorName} targetName={targetName} playerNames={G.players.map(p => p.name)} newInitiatorName={newInitiatorName} role={role} didVote={didVote} numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length} showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined} onPlayNeighClick={onPlayNeighClick} onDontPlayNeighClick={onDontPlayNeighClick} pendingPlayerNames={pendingPlayerNames} />
+            <NeighLabel
+                card={G.deck[G.neighDiscussion.cardID]}
+                originalInitiatorName={originalInitiatorName}
+                targetName={targetName}
+                playerNames={G.players.map(p => p.name)}
+                newInitiatorName={newInitiatorName}
+                role={role}
+                didVote={didVote}
+                numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length}
+                showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined}
+                onPlayNeighClick={onPlayNeighClick}
+                onDontPlayNeighClick={onDontPlayNeighClick}
+                pendingPlayerNames={pendingPlayerNames}
+                isHost={String(playerID) === "0"}
+                voteTimeoutStartedAt={G.neighDiscussion.voteTimeoutStartedAt}
+                voteTimeoutDurationSec={G.neighDiscussion.voteTimeoutDurationSec}
+                onStartVoteTimer={() => moves.startNeighVoteTimer(playerID)}
+                onForceVoteTimeout={() => moves.forceNeighVoteTimeout()}
+            />
         </NeighLabelWrapper>
     );
 }
