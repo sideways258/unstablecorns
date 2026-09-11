@@ -258,19 +258,12 @@ const Board = (props: any) => {
         }
     });
 
-    if (boardStates.find(s => s.type === "destroy__click_on_card_in_stable" || s.type === "sacrifice__clickOnCardInStable")) {
-        const boardState = boardStates.find(s => s.type === "destroy__click_on_card_in_stable" || s.type === "sacrifice__clickOnCardInStable")!;
-        // only update if the card interaction is different 
-        // prevents the client from rendering indefinitely
-        if (cardInteraction?.info?.instructionID !== boardState.info!.instructionID) {
-            setCardInteraction({
-                key: "click_on_other_stable_card", info: {
-                    targets: boardState.info!.targets,
-                    instructionID: boardState.info!.instructionID,
-                }
-            });
-        }
-    }
+    // NOTE: "destroy__click_on_card_in_stable" / "sacrifice__clickOnCardInStable"
+    // are intentionally NOT auto-activated here. When a player has several
+    // begin-of-turn upgrades offering a choice at once, silently priming
+    // targeting for whichever one happened to be first would pick for them.
+    // Instead the player must click the glowing source card first (see
+    // onStableItemClick below), exactly like every other card-to-card effect.
 
     // Card to Card Hover Interaction Online
     const [C2CArrow, setC2CArrow] = useState<{ fromX: number, fromY: number, toX: number, toY: number } | undefined>(undefined);
@@ -701,6 +694,23 @@ const Board = (props: any) => {
                                             startingMousePosition: { ...from }
                                         }
                                     });
+                                }
+
+                                // "click a card in a stable" effects (e.g. Glitter Bomb's
+                                // SACRIFICE step, Light Cannon's DESTROY step): clicking the
+                                // glowing source card is what chooses THIS card's effect -
+                                // required so that with several such upgrades queued at once,
+                                // the player picks which one, instead of it being auto-primed.
+                                if (!boardState) {
+                                    boardState = _.first(boardStates.filter(s => s.info?.sourceCardID === cardID && (s.type === "destroy__click_on_card_in_stable" || s.type === "sacrifice__clickOnCardInStable")));
+                                    if (boardState) {
+                                        setCardInteraction({
+                                            key: "click_on_other_stable_card", info: {
+                                                targets: boardState.info!.targets,
+                                                instructionID: boardState.info!.instructionID,
+                                            }
+                                        });
+                                    }
                                 }
 
                                 boardState = _.first(boardStates.filter(s => (s.type === "swapHands__cardToPlayer" || s.type === "pullRandom__cardToPlayer" || s.type === "move2__cardToPlayer" || s.type === "makeSomeoneDiscard__cardToPlayer" || s.type === "unicornswap2" || s.type === "blatantThievery1") && s.info?.sourceCardID === cardID));
@@ -1141,8 +1151,8 @@ const renderInfoLabel = (G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, 
 
     if (ctx.currentPlayer === playerID && ctx.activePlayers![playerID] === "beginning" && openScenes.length > 0) {
         text = openScenes.length > 1
-            ? "Some of your cards have effects that can be activated - hover a card to activate it, in any order you like. Once you're done (or skip them), draw a card to start your turn."
-            : "One of your cards has an effect that can be activated. You can activate it and after that draw a card to start your turn. You may also skip the effect and just draw a card."
+            ? "Some of your cards have effects that can be activated - click the glowing card you want to use, in any order you like. Once you're done (or skip them), draw a card to start your turn."
+            : "One of your cards has an effect that can be activated. Click it to activate it, then draw a card to start your turn. You may also skip the effect and just draw a card."
     }
 
     if (ctx.currentPlayer === playerID && ctx.activePlayers![playerID] === "beginning" && scenesInProgress.length > 0) {
@@ -1162,11 +1172,19 @@ const renderInfoLabel = (G: UnstableUnicornsGame, ctx: Ctx, playerID: PlayerID, 
     }
 
     if (boardStates.find(o => o.type === "destroy__click_on_card_in_stable")) {
-        text = "Click on a card in a player's stable to destroy that card."
+        const boardState = boardStates.find(o => o.type === "destroy__click_on_card_in_stable")!;
+        const sourceCard = boardState.info?.sourceCardID !== undefined ? G.deck[boardState.info.sourceCardID] : undefined;
+        text = sourceCard
+            ? `Click ${sourceCard.title} to activate it, then click a card in a player's stable to destroy that card.`
+            : "Click on a card in a player's stable to destroy that card."
     }
 
     if (boardStates.find(o => o.type === "sacrifice__clickOnCardInStable")) {
-        text = "Click on a card in your stable to sacrifice that card."
+        const boardState = boardStates.find(o => o.type === "sacrifice__clickOnCardInStable")!;
+        const sourceCard = boardState.info?.sourceCardID !== undefined ? G.deck[boardState.info.sourceCardID] : undefined;
+        text = sourceCard
+            ? `Click ${sourceCard.title} to activate it, then click a card in your stable to sacrifice that card.`
+            : "Click on a card in your stable to sacrifice that card."
     }
 
     if (boardStates.find(o => o.type === "steal__cardToCard")) {

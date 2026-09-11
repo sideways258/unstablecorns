@@ -568,6 +568,7 @@ function playCard(G, ctx, protagonist, cardID) {
                     playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
                 }],
             target: protagonist
+            // Timer stays off until the host clicks "Start timer" (startNeighVoteTimer).
         };
     }
 }
@@ -671,7 +672,7 @@ function dontPlayNeigh(G, ctx, protagonist, roundIndex) {
         }
     }
 }
-var NEIGH_VOTE_TIMER_SEC = 15;
+var NEIGH_VOTE_TIMER_SEC = 10;
 // Host-only. Arms a countdown for the current neigh round; once it expires,
 // forceNeighVoteTimeout() auto-picks "don't neigh" for anyone still undecided.
 function startNeighVoteTimer(G, ctx, protagonist) {

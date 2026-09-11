@@ -209,7 +209,8 @@ function getExecutionDoState(G: UnstableUnicornsGame, ctx: Ctx, playerID: Player
                 states.push({
                     type: "destroy__click_on_card_in_stable", info: {
                         targets: findDestroyTargets(G, ctx, playerID, instruction.do.info, instruction.ui.info?.source),
-                        instructionID: instruction.id
+                        instructionID: instruction.id,
+                        sourceCardID: instruction.ui.info?.source,
                     }
                 })
             }
