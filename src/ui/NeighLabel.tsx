@@ -163,6 +163,16 @@ const NeighLabel = (props: Props) => {
                     </Buttons>
                 )}
 
+                {voteTimeoutSecsLeft !== undefined && (
+                    <CountdownBar $danger={voteTimeoutSecsLeft <= 5}>
+                        <CountdownNum>
+                            0:{voteTimeoutSecsLeft < 10 ? '0' : ''}
+                            {voteTimeoutSecsLeft}
+                        </CountdownNum>
+                        <span>auto-selecting &ldquo;don&rsquo;t neigh&rdquo; for anyone still undecided</span>
+                    </CountdownBar>
+                )}
+
                 {props.pendingPlayerNames && props.pendingPlayerNames.length > 0 && (
                     <Pending>
                         <PendingLabel>Waiting on:</PendingLabel>
@@ -171,11 +181,7 @@ const NeighLabel = (props: Props) => {
                                 <PendingChip key={name}>{name}</PendingChip>
                             ))}
                         </PendingChips>
-                        {voteTimeoutSecsLeft !== undefined ? (
-                            <TimerBadge>
-                                ⏱ auto-skipping in {voteTimeoutSecsLeft}s
-                            </TimerBadge>
-                        ) : props.isHost && props.onStartVoteTimer ? (
+                        {voteTimeoutSecsLeft === undefined && props.isHost && props.onStartVoteTimer && (
                             <TimerButton
                                 onClick={() => {
                                     props.onStartVoteTimer!();
@@ -185,7 +191,7 @@ const NeighLabel = (props: Props) => {
                             >
                                 ⏱ Start timer
                             </TimerButton>
-                        ) : null}
+                        )}
                     </Pending>
                 )}
             </Wrapper>
@@ -322,16 +328,37 @@ const PendingChip = styled.span`
     background: linear-gradient(135deg, #ffd76a, #f8b500);
 `;
 
-const TimerBadge = styled.span`
-    margin-left: auto;
-    padding: 0.3em 0.8em;
-    border-radius: 999px;
-    font-size: 10pt;
-    font-weight: 700;
+const countdownPulse = keyframes`
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+`;
+
+const CountdownBar = styled.div<{ $danger: boolean }>`
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: ${props => props.$danger ? 'rgba(255, 107, 107, 0.22)' : 'rgba(124, 92, 255, 0.18)'};
+    border: 2px solid ${props => props.$danger ? '#ff6b6b' : '#7c5cff'};
+
+    span {
+        font-size: 10.5pt;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+    }
+`;
+
+const CountdownNum = styled.div`
+    font-variant-numeric: tabular-nums;
+    font-size: 22pt;
+    font-weight: 800;
+    line-height: 1;
     color: #fff;
-    background: rgba(255, 107, 107, 0.25);
-    border: 1.5px solid #ff6b6b;
-    white-space: nowrap;
+    flex: none;
+    animation: ${countdownPulse} 1s ease-in-out infinite;
 `;
 
 const TimerButton = styled.button`
