@@ -52,7 +52,7 @@ var UnstableUnicorns = {
     },
     // Available in every phase/stage so the host can always bail out, any player
     // can drop out, and the turn timer keeps working.
-    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote },
+    moves: { endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, autoStartNeighVoteTimer: autoStartNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote },
     setup: function (ctx, setupData) {
         var funny = funnyNames_1.funnyNames(ctx.numPlayers);
         var players = Array.from({ length: ctx.numPlayers }, function (val, idx) {
@@ -234,17 +234,18 @@ var UnstableUnicorns = {
                 moves: { ready: ready, unready: unready, selectBaby: selectBaby, changeName: changeName, endMatch: endMatch, setExpansions: setExpansions, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote }
             },
             beginning: {
-                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote }
+                moves: { drawAndAdvance: drawAndAdvance, executeDo: do_2.executeDo, end: end, commit: commit, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, autoStartNeighVoteTimer: autoStartNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote }
             },
             action_phase: {
                 moves: {
-                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote
+                    commit: commit, executeDo: do_2.executeDo, end: end, drawAndEnd: drawAndEnd, playCard: playCard, playUpgradeDowngradeCard: playUpgradeDowngradeCard, playNeigh: playNeigh, playSuperNeigh: playSuperNeigh, dontPlayNeigh: dontPlayNeigh, skipExecuteDo: skipExecuteDo, setUIHoverHandIndex: setUIHoverHandIndex, setUICardToCard: setUICardToCard, endMatch: endMatch, playerLeft: playerLeft, setTurnTimer: setTurnTimer, forceEndTurnOnTimeout: forceEndTurnOnTimeout, startNeighVoteTimer: startNeighVoteTimer, autoStartNeighVoteTimer: autoStartNeighVoteTimer, forceNeighVoteTimeout: forceNeighVoteTimeout, giveNeighCards: giveNeighCards, startKickVote: startKickVote, castKickVote: castKickVote, cancelKickVote: cancelKickVote
                 }
             }
         }
     }
 };
 function initializeGame(G, ctx) {
+    G.gameStartedAt = Date.now();
     // If the host enabled any expansion packs, rebuild the deck from base + those
     // packs and re-deal hands / draw pile. Card ids 0..12 stay the Baby Unicorns.
     if (G.expansions && G.expansions.length > 0) {
@@ -583,8 +584,10 @@ function playCard(G, ctx, protagonist, cardID) {
                     state: "open",
                     playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
                 }],
-            target: protagonist
-            // Timer stays off until the host clicks "Start timer" (startNeighVoteTimer).
+            target: protagonist,
+            // Timer stays off until the host clicks "Start timer" (startNeighVoteTimer)
+            // or 30s of inactivity auto-arms it (autoStartNeighVoteTimer).
+            lastActivityAt: Date.now()
         };
     }
 }
@@ -609,7 +612,8 @@ function playUpgradeDowngradeCard(G, ctx, protagonist, targetPlayer, cardID) {
                     state: "open",
                     playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
                 }],
-            target: targetPlayer
+            target: targetPlayer,
+            lastActivityAt: Date.now()
         };
     }
 }
@@ -635,9 +639,11 @@ function playNeigh(G, ctx, cardID, protagonist, roundIndex) {
             state: "open",
             playerState: Object.fromEntries(_activePlayers(G).map(function (pl) { return ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]); }))
         });
-        // the set of undecided voters just changed - the host must re-arm the timer
+        // the set of undecided voters just changed - the host must re-arm the
+        // timer (or wait for it to auto-arm again after another 30s of quiet).
         G.neighDiscussion.voteTimeoutStartedAt = undefined;
         G.neighDiscussion.voteTimeoutDurationSec = undefined;
+        G.neighDiscussion.lastActivityAt = Date.now();
     }
 }
 function playSuperNeigh(G, ctx, cardID, protagonist, roundIndex) {
@@ -680,6 +686,7 @@ function dontPlayNeigh(G, ctx, protagonist, roundIndex) {
             return;
         }
         round.playerState[protagonist] = { vote: "no_neigh" };
+        G.neighDiscussion.lastActivityAt = Date.now();
         if (underscore_1["default"].findKey(round.playerState, function (val) { return val.vote === "undecided"; }) === undefined) {
             // everyone has voted => advance the game
             var cardWasNeighed = G.neighDiscussion.rounds.length % 2 === 0;
@@ -703,6 +710,24 @@ function startNeighVoteTimer(G, ctx, protagonist) {
         return core_1.INVALID_MOVE;
     }
     if (!G.neighDiscussion) {
+        return core_1.INVALID_MOVE;
+    }
+    G.neighDiscussion.voteTimeoutStartedAt = Date.now();
+    G.neighDiscussion.voteTimeoutDurationSec = NEIGH_VOTE_TIMER_SEC;
+}
+var NEIGH_AUTO_ARM_IDLE_MS = 30 * 1000;
+// Any player may call this - it's a no-op unless the countdown genuinely
+// isn't armed yet AND nobody has touched this discussion in the last 30s.
+// Lets the round resolve itself even if the host never clicks "Start timer".
+function autoStartNeighVoteTimer(G, ctx) {
+    if (!G.neighDiscussion) {
+        return core_1.INVALID_MOVE;
+    }
+    if (G.neighDiscussion.voteTimeoutStartedAt) {
+        return core_1.INVALID_MOVE;
+    }
+    var last = G.neighDiscussion.lastActivityAt;
+    if (!last || Date.now() - last < NEIGH_AUTO_ARM_IDLE_MS) {
         return core_1.INVALID_MOVE;
     }
     G.neighDiscussion.voteTimeoutStartedAt = Date.now();

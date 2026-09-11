@@ -97,6 +97,36 @@ function wrapDbWithMatchLock(db) {
     return db;
 }
 
+// A disk/file-I/O hiccup on a write (a full disk, a permissions issue, a
+// transient node-persist error) must never be allowed to reach boardgame.io
+// as a rejected promise - depending on the version, an uncaught rejection
+// inside its move-processing can crash the entire Node process (Node's
+// default since v15 is to terminate on unhandled rejection), taking down
+// every match on the server over what should only ever cost this one write.
+// Losing a single persistence write is a fine trade for never going down.
+//
+// `fetch` is deliberately NOT included here: boardgame.io genuinely needs
+// real state back to process a move, so there's no safe synthetic value to
+// hand back on failure - a fetch failure should surface loudly (server.js
+// installs a process-level safety net for that) rather than be papered over
+// with fabricated data that could corrupt the match.
+function wrapDbNeverThrowOnWrite(db) {
+    ["setState", "setMetadata", "wipe", "createMatch"].forEach(function (method) {
+        if (typeof db[method] !== "function") { return; }
+        var original = db[method].bind(db);
+        db[method] = function () {
+            var args = arguments;
+            return Promise.resolve()
+                .then(function () { return original.apply(null, args); })
+                .catch(function (e) {
+                    console.warn("Match storage: " + method + " failed (continuing without persisting this change):", e && e.message);
+                    return undefined;
+                });
+        };
+    });
+    return db;
+}
+
 // Builds the persistent match store. Returns undefined (falling back to
 // boardgame.io's default in-memory storage) if FlatFile isn't available for
 // any reason - a missing/broken store should never stop the server from
@@ -129,6 +159,7 @@ function createDb() {
         var db = new FlatFile({ dir: MATCHES_DIR, logging: false, ttl: MATCH_MAX_AGE_MS });
         db = wrapDbWithActivityTracking(db);
         db = wrapDbWithMatchLock(db);
+        db = wrapDbNeverThrowOnWrite(db);
         return db;
     } catch (e) {
         console.warn("Match storage: failed to initialize FlatFile, falling back to in-memory:", e && e.message);

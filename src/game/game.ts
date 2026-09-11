@@ -66,6 +66,9 @@ export interface UnstableUnicornsGame extends Game {
     /** How many Neigh / Super Neigh cards each player has played this game,
      *  shown next to their name in the turn order panel. */
     neighCounts: { [key: string]: number };
+    /** Server timestamp for when the match actually left the lobby and started
+     *  (set once, in initializeGame) - drives the ticking "game time" display. */
+    gameStartedAt?: number;
     /** Host-initiated vote to force a player out of the game. Every other
      *  active player (except the target) gets a yes/no ballot; it resolves
      *  the moment a majority is reached either way, or once everyone still
@@ -165,7 +168,7 @@ const UnstableUnicorns = {
     },
     // Available in every phase/stage so the host can always bail out, any player
     // can drop out, and the turn timer / neigh vote timer keep working.
-    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote },
+    moves: { endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, autoStartNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote },
     setup: (ctx: Ctx, setupData: any): UnstableUnicornsGame => {
         const funny = funnyNames(ctx.numPlayers);
         const players: Player[] = Array.from({ length: ctx.numPlayers }, (val, idx) => {
@@ -357,11 +360,11 @@ const UnstableUnicorns = {
                 moves: { ready, unready, selectBaby, changeName, endMatch, setExpansions, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startKickVote, castKickVote, cancelKickVote }
             },
             beginning: {
-                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote }
+                moves: { drawAndAdvance, executeDo, end, commit, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, autoStartNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote }
             },
             action_phase: {
                 moves: {
-                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote
+                    commit, executeDo, end, drawAndEnd, playCard, playUpgradeDowngradeCard, playNeigh, playSuperNeigh, dontPlayNeigh, skipExecuteDo, setUIHoverHandIndex, setUICardToCard, endMatch, playerLeft, setTurnTimer, forceEndTurnOnTimeout, startNeighVoteTimer, autoStartNeighVoteTimer, forceNeighVoteTimeout, giveNeighCards, startKickVote, castKickVote, cancelKickVote
                 }
             }
         }
@@ -369,6 +372,8 @@ const UnstableUnicorns = {
 }
 
 function initializeGame(G: UnstableUnicornsGame, ctx: Ctx) {
+    G.gameStartedAt = Date.now();
+
     // If the host enabled any expansion packs, rebuild the deck from base + those
     // packs and re-deal hands / draw pile. Card ids 0..12 stay the Baby Unicorns
     // so babyStarter picks and the nursery logic below still line up.
@@ -752,7 +757,9 @@ function playCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID, card
                 playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
             }],
             target: protagonist,
-            // Timer stays off until the host clicks "Start timer" (startNeighVoteTimer).
+            // Timer stays off until the host clicks "Start timer" (startNeighVoteTimer)
+            // or 30s of inactivity auto-arms it (autoStartNeighVoteTimer).
+            lastActivityAt: Date.now(),
         };
     }
 }
@@ -780,6 +787,7 @@ function playUpgradeDowngradeCard(G: UnstableUnicornsGame, ctx: Ctx, protagonist
                 playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }]))),
             }],
             target: targetPlayer,
+            lastActivityAt: Date.now(),
         };
     }
 }
@@ -809,9 +817,11 @@ function playNeigh(G: UnstableUnicornsGame, ctx: Ctx, cardID: CardID, protagonis
             state: "open",
             playerState: Object.fromEntries(_activePlayers(G).map(pl => ([pl.id, { vote: pl.id === protagonist ? "no_neigh" : "undecided" }])))
         });
-        // the set of undecided voters just changed - the host must re-arm the timer
+        // the set of undecided voters just changed - the host must re-arm the
+        // timer (or wait for it to auto-arm again after another 30s of quiet).
         G.neighDiscussion.voteTimeoutStartedAt = undefined;
         G.neighDiscussion.voteTimeoutDurationSec = undefined;
+        G.neighDiscussion.lastActivityAt = Date.now();
     }
 }
 
@@ -861,6 +871,7 @@ function dontPlayNeigh(G: UnstableUnicornsGame, ctx: Ctx, protagonist: PlayerID,
             return;
         }
         round.playerState[protagonist] = { vote: "no_neigh" };
+        G.neighDiscussion.lastActivityAt = Date.now();
 
         if (_.findKey(round.playerState, val => val.vote === "undecided") === undefined) {
             // everyone has voted => advance the game
@@ -886,6 +897,27 @@ function startNeighVoteTimer(G: UnstableUnicornsGame, ctx: Ctx, protagonist: Pla
         return INVALID_MOVE;
     }
     if (!G.neighDiscussion) {
+        return INVALID_MOVE;
+    }
+    G.neighDiscussion.voteTimeoutStartedAt = Date.now();
+    G.neighDiscussion.voteTimeoutDurationSec = NEIGH_VOTE_TIMER_SEC;
+}
+
+const NEIGH_AUTO_ARM_IDLE_MS = 30 * 1000;
+
+// Any player may call this - it's a no-op unless the countdown genuinely
+// isn't armed yet AND nobody (a vote, or the host clicking Start timer) has
+// touched this discussion in the last 30s. Lets the round resolve itself
+// even if the host never shows up to click "Start timer".
+function autoStartNeighVoteTimer(G: UnstableUnicornsGame, ctx: Ctx) {
+    if (!G.neighDiscussion) {
+        return INVALID_MOVE;
+    }
+    if (G.neighDiscussion.voteTimeoutStartedAt) {
+        return INVALID_MOVE; // already armed (by hand or by this same auto-arm)
+    }
+    const last = G.neighDiscussion.lastActivityAt;
+    if (!last || Date.now() - last < NEIGH_AUTO_ARM_IDLE_MS) {
         return INVALID_MOVE;
     }
     G.neighDiscussion.voteTimeoutStartedAt = Date.now();

@@ -10,6 +10,11 @@ export interface NeighDiscussion {
      *  round starts (a Neigh was played), since the set of undecided voters changes. */
     voteTimeoutStartedAt?: number;
     voteTimeoutDurationSec?: number;
+    /** Stamped whenever someone casts a vote (Neigh / Super Neigh / Don't neigh),
+     *  or when the discussion first opens. Drives the auto-arm timer: if nobody
+     *  has voted (or the host hasn't started the countdown by hand) for 30s
+     *  since this, the countdown arms itself. */
+    lastActivityAt?: number;
 }
 
 type NeighRound = {

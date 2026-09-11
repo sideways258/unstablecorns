@@ -37,6 +37,23 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 exports.__esModule = true;
 // src/server.js
+
+// Since adding on-disk match persistence, a storage hiccup (a slow/full
+// disk, a transient file-I/O error) surfacing as an unhandled promise
+// rejection could otherwise take the ENTIRE process down - Node's default
+// since v15 is to terminate on any unhandled rejection. Writes are already
+// made non-throwing in matchStorage.js, but this is the last line of
+// defense against a failure ANYWHERE (a fetch failure, or anything
+// unrelated) crashing every in-progress match on the server. Trading "might
+// keep running in a slightly odd state" for "never goes down over one bad
+// promise" is the right call for a game server with people mid-match.
+process.on('unhandledRejection', function (reason) {
+    console.error('Unhandled promise rejection (server staying up):', reason);
+});
+process.on('uncaughtException', function (err) {
+    console.error('Uncaught exception (server staying up):', err);
+});
+
 var path = require("path");
 var serve = require('koa-static');
 var Server = require('boardgame.io/server').Server;

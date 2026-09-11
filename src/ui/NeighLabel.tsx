@@ -36,6 +36,12 @@ type Props = {
     onStartVoteTimer?: () => void;
     /** Called (repeatedly, harmlessly) once the countdown has actually run out. */
     onForceVoteTimeout?: () => void;
+    /** When the discussion last saw a vote (or first opened) - drives the
+     *  30s-of-quiet auto-arm below, independent of the host's Start timer button. */
+    lastActivityAt?: number;
+    /** Called (repeatedly, harmlessly) once 30s have passed with the timer still
+     *  unarmed - any client may call it, the move itself is guarded. */
+    onAutoStartVoteTimer?: () => void;
 }
 
 export type NeighLabelRole = "original_initiator" | "new_initiator" | "did_neigh" | "did_not_neigh" | "open" | "original_initiator_can_counterneigh";
@@ -72,6 +78,25 @@ const NeighLabel = (props: Props) => {
     const voteTimeoutSecsLeft = voteTimeoutStartedAt && voteTimeoutDurationSec
         ? Math.max(0, Math.ceil((voteTimeoutStartedAt + voteTimeoutDurationSec * 1000 - now) / 1000))
         : undefined;
+
+    // Auto-arm the countdown after 30s of nobody voting and nobody clicking
+    // "Start timer" - every client watches for this, not just the host, so
+    // the round can't stall forever just because the host stepped away.
+    const lastAutoArmFire = useRef(0);
+    const { lastActivityAt, onAutoStartVoteTimer } = props;
+    useEffect(() => {
+        if (voteTimeoutStartedAt || !lastActivityAt || !onAutoStartVoteTimer) return;
+        const tick = () => {
+            const n = Date.now();
+            if (n - lastActivityAt >= 30000 && n - lastAutoArmFire.current > 3000) {
+                lastAutoArmFire.current = n;
+                try { onAutoStartVoteTimer(); } catch (e) { /* another client already armed it */ }
+            }
+        };
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [voteTimeoutStartedAt, lastActivityAt, onAutoStartVoteTimer]);
 
     // Optimistic "starting…" state + a visible failure if the server never
     // confirms (e.g. a stale deploy that doesn't know this move yet) - without

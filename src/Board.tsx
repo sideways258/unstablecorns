@@ -16,7 +16,7 @@ import DrawPile from './ui/DrawPile';
 import Nursery from './ui/Nursery';
 import DiscardPile from './ui/DiscardPile';
 import { Card, CardID } from './game/card';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { findUITargets, HoverTarget } from './BoardUtil';
 import RainbowArrow from './ui/RainbowArrow';
 import EndTurnButton from './ui/button/EndTurnButton';
@@ -31,7 +31,6 @@ import InfoLabel from './ui/InfoLabel';
 import Finder from './ui/Finder';
 import BoardGameBegin from './BoardGameBegin';
 import React from 'react';
-import { LanguageContext } from './LanguageContextProvider';
 import GameEnded from './ui/GameEnded';
 import BoardShell from './ui/BoardShell';
 import TurnIndicator from './ui/TurnIndicator';
@@ -195,7 +194,6 @@ const Board = (props: any) => {
     const playerFieldRef = useRef<PlayerFieldHandle>(null);
     const [hoverTargets, setHoverTargets] = useState<{ sourceCardID: CardID, targets: HoverTarget[] }>();
     const [cardInteraction, setCardInteraction] = useState<CardInteraction | undefined>(undefined);
-    const context = useContext(LanguageContext);
 
     let openScenes: Array<[Instruction, Scene]> = _findInProgressScenesWithProtagonist(G, playerID);
     if (openScenes.length === 0) {
@@ -448,22 +446,6 @@ const Board = (props: any) => {
                 }}>
                     A
                 </div>
-                <div style={{
-                    position: "absolute", top: 0, left: 100
-                }} onClick={() => {
-                    context!.setLanguage("de")
-                }}>
-                    Deutsch
-                </div>
-                <div style={{
-                    position: "absolute", top: 0, right: 100
-                }} onClick={() => {
-                    context!.setLanguage("en")
-                }}>
-                    Englisch
-                </div>
-
-                
                 {showDeckFinder &&
                     <Finder
                         cards={showDeckFinder.map(s => G.deck[s.cardID])}
@@ -1035,6 +1017,8 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
                 voteTimeoutDurationSec={G.neighDiscussion.voteTimeoutDurationSec}
                 onStartVoteTimer={() => moves.startNeighVoteTimer(playerID)}
                 onForceVoteTimeout={() => moves.forceNeighVoteTimeout()}
+                lastActivityAt={G.neighDiscussion.lastActivityAt}
+                onAutoStartVoteTimer={() => moves.autoStartNeighVoteTimer()}
             />
         </NeighLabelWrapper>
     );
