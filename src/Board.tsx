@@ -988,13 +988,22 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
         }
     }
 
+    // Separate buttons/handlers for Neigh vs Super Neigh (rather than one
+    // button that silently prefers whichever the player happens to hold) -
+    // a player who holds both must be able to explicitly choose the Super
+    // Neigh to actually end the chain, instead of the game quietly playing
+    // their regular Neigh instead and extending it by a round.
     const onPlayNeighClick = () => {
         const neighCardOnHand = G.hand[playerID].map(c => G.deck[c]).find(c => c.type === "neigh");
         if (neighCardOnHand) {
             moves.playNeigh(neighCardOnHand.id, playerID, G.neighDiscussion!.rounds.length - 1)
-        } else {
-            const superNeigh = G.hand[playerID].map(c => G.deck[c]).find(c => c.type === "super_neigh");
-            moves.playSuperNeigh(superNeigh!.id, playerID, G.neighDiscussion!.rounds.length - 1)
+        }
+    }
+
+    const onPlaySuperNeighClick = () => {
+        const superNeigh = G.hand[playerID].map(c => G.deck[c]).find(c => c.type === "super_neigh");
+        if (superNeigh) {
+            moves.playSuperNeigh(superNeigh.id, playerID, G.neighDiscussion!.rounds.length - 1)
         }
     }
 
@@ -1020,8 +1029,16 @@ const renderNeighLabel = (G: UnstableUnicornsGame, ctx: Ctx, moves: any, playerI
                 role={role}
                 didVote={didVote}
                 numberOfNeighedCards={G.neighDiscussion.rounds.filter(s => s.state === "neigh").length}
-                showPlayNeighButton={G.hand[playerID].map(c => G.deck[c]).filter(c => c.type === "neigh" || c.type === "super_neigh").length > 0 && G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined}
+                showPlayNeighButton={
+                    G.hand[playerID].map(c => G.deck[c]).some(c => c.type === "neigh") &&
+                    G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined
+                }
+                showPlaySuperNeighButton={
+                    G.hand[playerID].map(c => G.deck[c]).some(c => c.type === "super_neigh") &&
+                    G.playerEffects[playerID].find(s => s.effect.key === "you_cannot_play_neigh") === undefined
+                }
                 onPlayNeighClick={onPlayNeighClick}
+                onPlaySuperNeighClick={onPlaySuperNeighClick}
                 onDontPlayNeighClick={onDontPlayNeighClick}
                 pendingPlayerNames={pendingPlayerNames}
                 isHost={String(playerID) === "0"}

@@ -26,6 +26,11 @@ type Props = {
     didVote: boolean;
     showPlayNeighButton: boolean;
     onPlayNeighClick: () => void;
+    /** Shown as its own button (never folded into "Play Neigh") so a player
+     *  holding both card types can explicitly choose the one that actually
+     *  ends the chain instead of the regular Neigh that just extends it. */
+    showPlaySuperNeighButton?: boolean;
+    onPlaySuperNeighClick?: () => void;
     onDontPlayNeighClick: () => void;
     /** Names of players who still haven't clicked "Neigh" or "Don't neigh" this round. */
     pendingPlayerNames?: string[];
@@ -205,6 +210,17 @@ const NeighLabel = (props: Props) => {
                                 Play Neigh
                             </NeighButton>
                         )}
+                        {props.showPlaySuperNeighButton && props.onPlaySuperNeighClick && (
+                            <SuperNeighButton
+                                onClick={() => {
+                                    props.onPlaySuperNeighClick!();
+                                    playMouseClick();
+                                }}
+                                title="Ends the chain - cannot be neighed"
+                            >
+                                Play Super Neigh
+                            </SuperNeighButton>
+                        )}
                     </Buttons>
                 )}
 
@@ -346,6 +362,12 @@ const DontNeighButton = styled.div`
 const NeighButton = styled.div`
     ${chunky}
     background: linear-gradient(135deg, #4ade80, #148f4b);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
+`;
+
+const SuperNeighButton = styled.div`
+    ${chunky}
+    background: linear-gradient(135deg, #7c5cff, #4b2fb5);
     box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
 `;
 

@@ -28,33 +28,12 @@ var CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 // created, and never touches it again - NOT on every move like the name
 // suggests. Left as-is, a match played every day for months would still look
 // 30+ days "old" and get swept the moment nobody happens to join/leave it,
-// silently deleting an active game. This wraps setState (which boardgame.io
-// calls on every move) so metadata.updatedAt actually reflects the last time
-// someone did something, which is what the cleanup sweep needs it to mean.
-//
-// Captures raw, unwrapped references to fetch/setMetadata at wrap time (not a
-// live `db.fetch` lookup) specifically so this keeps working correctly once
-// wrapDbWithMatchLock (below) is layered on top - those calls must bypass the
-// per-match queue, not re-enter it (see that function's comment for why).
-function wrapDbWithActivityTracking(db) {
-    var originalSetState = db.setState.bind(db);
-    var rawFetch = db.fetch.bind(db);
-    var rawSetMetadata = db.setMetadata.bind(db);
-    db.setState = async function (matchID, state, deltalog) {
-        var result = await originalSetState(matchID, state, deltalog);
-        try {
-            var existing = await rawFetch(matchID, { metadata: true });
-            if (existing && existing.metadata) {
-                existing.metadata.updatedAt = Date.now();
-                await rawSetMetadata(matchID, existing.metadata);
-            }
-        } catch (e) {
-            console.warn("Match storage: failed to bump activity timestamp for " + matchID + ":", e && e.message);
-        }
-        return result;
-    };
-    return db;
-}
+// silently deleting an active game. FileStore.setState (fileStore.js) bumps
+// updatedAt itself, in the same read-modify-write as the state, so the
+// cleanup sweep below sees real activity without an extra disk round trip
+// on every move (a separate fetch+setMetadata wrapper here used to double
+// the I/O, and therefore latency, of every single move - noticeable as lag
+// under real play).
 
 // boardgame.io processes a move as fetch(state) -> apply the move -> setState
 // (new state). With the default in-memory store that whole cycle is
@@ -68,11 +47,7 @@ function wrapDbWithActivityTracking(db) {
 //
 // This serializes every fetch/setState/setMetadata/wipe/createMatch call for
 // a given matchID into one FIFO queue, so a match's read-modify-write cycles
-// can never interleave with each other regardless of I/O timing. It must be
-// the OUTERMOST wrapper (applied after wrapDbWithActivityTracking) - that
-// wrapper's own internal fetch/setMetadata calls use raw, pre-wrap references
-// specifically so they don't re-enter this queue from inside an already
-// in-flight job for the same matchID, which would deadlock it forever.
+// can never interleave with each other regardless of I/O timing.
 function wrapDbWithMatchLock(db) {
     var queueTails = {}; // matchID -> tail of that match's pending job chain
 
@@ -143,7 +118,6 @@ function createDb() {
 
     try {
         var db = new FileStore({ dir: MATCHES_DIR });
-        db = wrapDbWithActivityTracking(db);
         db = wrapDbWithMatchLock(db);
         db = wrapDbNeverThrowOnWrite(db);
         return db;

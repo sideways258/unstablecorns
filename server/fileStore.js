@@ -15,9 +15,10 @@
 // match hanging on "connecting..." forever (its first fetch never resolved)
 // is a bad failure mode for something this simple to just do ourselves.
 //
-// Every operation here is a plain fs.promises call against a file this code
-// names itself - there's no other package's initialization order to get
-// out of sync with.
+// Every disk operation here is a plain fs.promises call against a file this
+// code names itself - there's no other package's initialization order to
+// get out of sync with. A small in-process read cache (see _cache below)
+// keeps per-move latency down.
 exports.__esModule = true;
 
 var fs = require("fs");
@@ -32,28 +33,46 @@ function matchFile(dir, matchID) {
     return path.join(dir, safe + ".json");
 }
 
-async function readMatch(dir, matchID) {
-    try {
-        var raw = await fs.promises.readFile(matchFile(dir, matchID), "utf8");
-        return JSON.parse(raw);
-    } catch (e) {
-        if (e && e.code === "ENOENT") { return undefined; }
-        throw e;
+// boardgame.io calls fetch(metadata) then fetch(state) back-to-back for
+// every single move, and this module's own setState does a read before its
+// write - that's 2-3 reads of the same file per move if each one hits disk.
+// matchStorage.js's wrapDbWithMatchLock serializes every fetch/setState/
+// setMetadata/wipe/createMatch call for a given matchID into one queue, so
+// within this process nothing else can be reading or writing a match's file
+// between a cache fill and its invalidation - caching the parsed object per
+// matchID is safe and turns most of those extra reads into cache hits.
+// `null` is cached too (a known-absent match), so a miss doesn't re-hit disk
+// on every fetch either.
+async function readMatch(store, matchID) {
+    if (Object.prototype.hasOwnProperty.call(store._cache, matchID)) {
+        return store._cache[matchID];
     }
+    var data = null;
+    try {
+        var raw = await fs.promises.readFile(matchFile(store.dir, matchID), "utf8");
+        data = JSON.parse(raw);
+    } catch (e) {
+        if (!e || e.code !== "ENOENT") { throw e; }
+    }
+    store._cache[matchID] = data;
+    return data;
 }
 
 // Write to a temp file then rename - rename is atomic on the same
 // filesystem, so a crash or restart mid-write can never leave a half-written
-// (corrupt / unparsable) match file behind.
-async function writeMatch(dir, matchID, data) {
-    var file = matchFile(dir, matchID);
+// (corrupt / unparsable) match file behind. Updates the cache so a fetch
+// right after doesn't need to re-read what was just written.
+async function writeMatch(store, matchID, data) {
+    var file = matchFile(store.dir, matchID);
     var tmp = file + "." + process.pid + "." + Date.now() + ".tmp";
     await fs.promises.writeFile(tmp, JSON.stringify(data), "utf8");
     await fs.promises.rename(tmp, file);
+    store._cache[matchID] = data;
 }
 
 function FileStore(opts) {
     this.dir = (opts && opts.dir) || path.join(__dirname, "matches");
+    this._cache = Object.create(null); // matchID -> parsed match object | null
 }
 
 FileStore.prototype.type = function () {
@@ -65,7 +84,7 @@ FileStore.prototype.connect = async function () {
 };
 
 FileStore.prototype.createMatch = async function (matchID, opts) {
-    await writeMatch(this.dir, matchID, {
+    await writeMatch(this, matchID, {
         state: opts.initialState,
         initialState: opts.initialState,
         log: [],
@@ -74,24 +93,32 @@ FileStore.prototype.createMatch = async function (matchID, opts) {
 };
 
 FileStore.prototype.setState = async function (matchID, state, deltalog) {
-    var existing = (await readMatch(this.dir, matchID)) || { log: [] };
+    var existing = (await readMatch(this, matchID)) || { log: [] };
     var log = Array.isArray(existing.log) ? existing.log : [];
     if (deltalog && deltalog.length > 0) {
         log = log.concat(deltalog);
     }
     existing.state = state;
     existing.log = log;
-    await writeMatch(this.dir, matchID, existing);
+    // Bumped here, in the same read-modify-write as the state itself, rather
+    // than as a separate fetch+setMetadata round trip after the fact (that
+    // used to double the disk I/O - and therefore latency - of every single
+    // move). See matchStorage.js's header comment for why this timestamp
+    // needs to track real activity at all.
+    if (existing.metadata) {
+        existing.metadata.updatedAt = Date.now();
+    }
+    await writeMatch(this, matchID, existing);
 };
 
 FileStore.prototype.setMetadata = async function (matchID, metadata) {
-    var existing = (await readMatch(this.dir, matchID)) || { log: [] };
+    var existing = (await readMatch(this, matchID)) || { log: [] };
     existing.metadata = metadata;
-    await writeMatch(this.dir, matchID, existing);
+    await writeMatch(this, matchID, existing);
 };
 
 FileStore.prototype.fetch = async function (matchID, opts) {
-    var existing = await readMatch(this.dir, matchID);
+    var existing = await readMatch(this, matchID);
     var result = {};
     if (!existing) { return result; }
     if (opts && opts.state) { result.state = existing.state; }
@@ -107,6 +134,7 @@ FileStore.prototype.wipe = async function (matchID) {
     } catch (e) {
         if (!e || e.code !== "ENOENT") { throw e; }
     }
+    this._cache[matchID] = null;
 };
 
 FileStore.prototype.listMatches = async function (opts) {
@@ -125,7 +153,7 @@ FileStore.prototype.listMatches = async function (opts) {
 
     var self = this;
     var results = await Promise.all(matchIDs.map(async function (matchID) {
-        var existing = await readMatch(self.dir, matchID);
+        var existing = await readMatch(self, matchID);
         var metadata = existing && existing.metadata;
         if (!metadata) { return null; }
         if (opts.gameName && opts.gameName !== metadata.gameName) { return null; }
